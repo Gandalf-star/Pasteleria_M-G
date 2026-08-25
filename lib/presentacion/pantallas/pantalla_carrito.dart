@@ -116,6 +116,105 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
     }
   }
 
+  Future<void> _confirmarPedidoFinanciado(List<ItemCarrito> items, double total) async {
+    if (items.isEmpty) return;
+
+    final repoAuth = ref.read(proveedorRepositorioAutenticacion);
+    final esCliente = await repoAuth.esCliente();
+
+    if (!esCliente) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Registro Requerido'),
+            content: const Text('Debes iniciar sesión o registrarte para poder solicitar financiamiento con el Club M&G.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.pushNamed(context, '/registro_usuario');
+                },
+                child: const Text('Registrarse / Iniciar Sesión'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    setState(() => _procesando = true);
+
+    try {
+      final repoOrdenes = ref.read(proveedorRepositorioOrdenes);
+      
+      // 1. Guardar orden en BD
+      final idOrden = await repoOrdenes.crearOrden(items, total, esFinanciamiento: true);
+      
+      // 2. Construir mensaje de WhatsApp para Financiamiento
+      final supabase = ref.read(supabaseProveedor);
+      final negocioRes = await supabase.from('negocios').select('telefono').eq('id', Entorno.idSweetBites).maybeSingle();
+      final telefonoDb = negocioRes?['telefono'] as String? ?? '';
+      final numeroAdmin = telefonoDb.replaceAll(RegExp(r'[^\d]'), '');
+
+      final cuota = (total / 3).toStringAsFixed(2);
+
+      final buffer = StringBuffer();
+      buffer.writeln('🌟 *¡Hola Pasteleria M&G!*');
+      buffer.writeln('Quiero solicitar financiamiento con el *Club M&G* para este pedido:');
+      buffer.writeln('');
+      buffer.writeln('💳 *Orden ID:* ${idOrden.split('-').first.toUpperCase()}');
+      buffer.writeln('\n*Resumen de mi pedido:*');
+      
+      for (final item in items) {
+        final nombre = item.producto['nombre'];
+        final precio = double.tryParse(item.producto['precio'].toString()) ?? 0.0;
+        buffer.writeln('• ${item.cantidad}x $nombre - \$${(precio * item.cantidad).toStringAsFixed(2)}');
+      }
+      
+      buffer.writeln('\n💰 *Total:* \$${total.toStringAsFixed(2)}');
+      buffer.writeln('🍰 *Plan Sugerido:* 1 pago inicial de \$$cuota y 2 cuotas de \$$cuota');
+      buffer.writeln('\n¡Quedo a la espera de aprobación!');
+
+      final uri = Uri.parse('https://wa.me/$numeroAdmin?text=${Uri.encodeComponent(buffer.toString())}');
+      
+      // 3. Abrir WhatsApp
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        throw Exception('No se pudo abrir WhatsApp');
+      }
+
+      // 4. Limpiar carrito y cerrar
+      ref.read(proveedorCarrito.notifier).limpiarCarrito();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('¡Solicitud de financiamiento enviada!'),
+            backgroundColor: Colors.amber,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al procesar la solicitud: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
@@ -293,6 +392,32 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
                                 ),
                               ),
                             ),
+                            if (total >= 5.0) ...[
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 56,
+                                child: ElevatedButton.icon(
+                                  onPressed: _procesando ? null : () => _confirmarPedidoFinanciado(items, total),
+                                  icon: _procesando 
+                                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2))
+                                      : const Icon(Icons.star_rounded, color: Colors.amber),
+                                  label: Text(
+                                    _procesando ? 'Procesando...' : 'Financiar con Club M&G',
+                                    style: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16, color: Colors.amber.shade900),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.amber.withAlpha(50),
+                                    foregroundColor: Colors.amber.shade900,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: BorderSide(color: Colors.amber.shade300, width: 2),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

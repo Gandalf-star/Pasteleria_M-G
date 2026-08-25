@@ -7,6 +7,8 @@ import '../../repositorios/repositorio_productos.dart';
 import '../../proveedores/proveedor_carrito.dart';
 import 'pantalla_carrito.dart';
 import 'pantalla_chat.dart';
+import 'pantalla_club_mg.dart';
+import 'pantalla_perfil.dart';
 import '../../nucleo/constantes/entorno.dart';
 import 'package:uuid/uuid.dart';
 
@@ -162,6 +164,34 @@ class _PantallaInicialState extends ConsumerState<PantallaInicial> {
                       )
                     : null,
               ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person, color: Colors.blueAccent),
+              title: const Text(
+                'Mi Perfil',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PantallaPerfil()),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.star_rounded, color: Colors.amber),
+              title: const Text(
+                'Club M&G (Mis Cuotas)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              onTap: () {
+                Navigator.pop(context); // Cerrar drawer
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PantallaClubMg()),
+                );
+              },
             ),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
@@ -553,6 +583,7 @@ class _TarjetaProductoIrresistible extends ConsumerWidget {
     final descripcion =
         producto['descripcion'] ?? 'Delicioso postre horneado con amor.';
     final precio = producto['precio']?.toString() ?? '0.0';
+    final precioD = double.tryParse(precio) ?? 0.0;
     final urlImagen = producto['url_imagen'];
 
     return Container(
@@ -628,6 +659,33 @@ class _TarjetaProductoIrresistible extends ConsumerWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
+                if (precioD >= 5.0) // Mostrar solo para productos de $5 o más
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withAlpha(40),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.amber.withAlpha(100)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Club M&G: Llévalo hoy y paga en 3 cuotas de \$${(precioD / 3).toStringAsFixed(2)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.amber.shade800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                if (precioD >= 5.0) const SizedBox(height: 8),
                 Text(
                   descripcion,
                   style: GoogleFonts.inter(
