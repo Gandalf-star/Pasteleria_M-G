@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/flutter_service_worker.js",
+      "destination": "/killer_sw.js"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
