@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../repositorios/repositorio_autenticacion.dart';
+import '../../../nucleo/tema/tokens_app.dart';
+import '../../../repositorios/repositorio_autenticacion.dart';
+import '../../widgets/componentes.dart';
+import 'pantalla_registro_usuario.dart';
 
 class PantallaLogin extends ConsumerStatefulWidget {
   const PantallaLogin({super.key});
@@ -26,10 +28,17 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
     _cargarCredenciales();
   }
 
+  @override
+  void dispose() {
+    _controladorCorreo.dispose();
+    _controladorContrasena.dispose();
+    super.dispose();
+  }
+
   Future<void> _cargarCredenciales() async {
     final prefs = await SharedPreferences.getInstance();
     final recordar = prefs.getBool('recordar_contrasena') ?? false;
-    if (recordar) {
+    if (recordar && mounted) {
       setState(() {
         _recordarContrasena = true;
         _controladorCorreo.text = prefs.getString('correo') ?? '';
@@ -40,16 +49,16 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
 
   Future<void> _iniciarSesion() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _cargando = true);
-    
+
     try {
       final repoAuth = ref.read(proveedorRepositorioAutenticacion);
       await repoAuth.iniciarSesion(
         _controladorCorreo.text.trim(),
         _controladorContrasena.text,
       );
-      
+
       final prefs = await SharedPreferences.getInstance();
       if (_recordarContrasena) {
         await prefs.setBool('recordar_contrasena', true);
@@ -60,21 +69,15 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
         await prefs.remove('correo');
         await prefs.remove('contrasena');
       }
-      
+
       if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/inicial',
-          (route) => false,
-        );
+        Navigator.pushNamedAndRemoveUntil(context, '/inicial', (route) => false);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error al iniciar sesión. Verifica tus credenciales.'),
-            backgroundColor: Colors.redAccent,
-          ),
+        Avisos.error(
+          context,
+          'No pudimos iniciar sesión. Revisa tus credenciales.',
         );
       }
     } finally {
@@ -87,162 +90,203 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
     final tema = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: tema.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: tema.colorScheme.primary),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 20),
-                // Icono animado
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: tema.colorScheme.primaryContainer,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.cake_rounded,
-                      size: 60,
-                      color: tema.colorScheme.primary,
-                    ),
-                  ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
+      body: FondoAtelier(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.e5,
+                  Tokens.e3,
+                  Tokens.e5,
+                  0,
                 ),
-                const SizedBox(height: 32),
-                
-                Text(
-                  '¡Hola de nuevo!',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.outfit(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: tema.textTheme.displayLarge?.color,
-                  ),
-                ).animate().slideY(begin: 0.3, duration: 500.ms).fadeIn(),
-                
-                const SizedBox(height: 8),
-                Text(
-                  'Ingresa a tu cuenta para pedir tus postres favoritos',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    color: tema.textTheme.bodyMedium?.color,
-                  ),
-                ).animate().slideY(begin: 0.3, delay: 100.ms, duration: 500.ms).fadeIn(),
-                
-                const SizedBox(height: 48),
-
-                // Correo
-                TextFormField(
-                  controller: _controladorCorreo,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Correo electrónico',
-                    prefixIcon: Icon(Icons.email_outlined),
-                    filled: true,
-                  ),
-                  validator: (v) => v!.contains('@') ? null : 'Correo inválido',
-                ).animate().slideX(begin: -0.2, delay: 200.ms, duration: 500.ms).fadeIn(),
-                
-                const SizedBox(height: 20),
-
-                // Contraseña
-                TextFormField(
-                  controller: _controladorContrasena,
-                  obscureText: _ocultarContrasena,
-                  decoration: InputDecoration(
-                    labelText: 'Contraseña',
-                    prefixIcon: const Icon(Icons.lock_outline_rounded),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _ocultarContrasena 
-                            ? Icons.visibility_outlined 
-                            : Icons.visibility_off_outlined,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _ocultarContrasena = !_ocultarContrasena;
-                        });
-                      },
+                child: Row(
+                  children: [
+                    BotonCircular(
+                      icono: Icons.arrow_back_rounded,
+                      tooltip: 'Volver',
+                      alPresionar: () => Navigator.maybePop(context),
                     ),
-                    filled: true,
+                    const Spacer(),
+                    const Antetitulo('Acceso de clientes'),
+                    const Spacer(),
+                    const SizedBox(width: 42),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    Tokens.e6,
+                    Tokens.e6,
+                    Tokens.e6,
+                    Tokens.e10,
                   ),
-                  validator: (v) => v!.length < 6 ? 'Mínimo 6 caracteres' : null,
-                ).animate().slideX(begin: 0.2, delay: 300.ms, duration: 500.ms).fadeIn(),
-                
-                const SizedBox(height: 8),
-
-                CheckboxListTile(
-                  title: Text(
-                    'Recordar contraseña',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: tema.textTheme.bodyMedium?.color,
-                    ),
-                  ),
-                  value: _recordarContrasena,
-                  onChanged: (val) {
-                    setState(() {
-                      _recordarContrasena = val ?? false;
-                    });
-                  },
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: tema.colorScheme.primary,
-                ).animate().fadeIn(delay: 400.ms),
-                
-                const SizedBox(height: 4),
-                
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {},
-                    child: Text(
-                      '¿Olvidaste tu contraseña?',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w600,
-                        color: tema.colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 500.ms),
-
-                const SizedBox(height: 32),
-
-                // Botón Ingresar
-                SizedBox(
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _cargando ? null : _iniciarSesion,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: tema.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 4,
-                      shadowColor: tema.colorScheme.primary.withAlpha(100),
-                    ),
-                    child: _cargando
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                            'Ingresar',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Center(
+                              child: const SelloMarca(tamano: 66)
+                                  .animate()
+                                  .scale(
+                                    duration: 600.ms,
+                                    curve: Curves.easeOutBack,
+                                    begin: const Offset(0.75, 0.75),
+                                  ),
                             ),
-                          ),
+                            const SizedBox(height: Tokens.e6),
+                            Text(
+                              'Bienvenido de vuelta',
+                              textAlign: TextAlign.center,
+                              style: tema.textTheme.displaySmall,
+                            ).animate().fadeIn(duration: 500.ms).slideY(
+                              begin: 0.14,
+                              curve: Curves.easeOutCubic,
+                            ),
+                            const SizedBox(height: Tokens.e3),
+                            Text(
+                              'Entra a tu cuenta para retomar tus pedidos y '
+                              'tus cuotas del Club M&G.',
+                              textAlign: TextAlign.center,
+                              style: tema.textTheme.bodyMedium,
+                            ).animate().fadeIn(delay: 120.ms),
+
+                            const SizedBox(height: Tokens.e8),
+
+                            TarjetaSuave(
+                              padding: const EdgeInsets.all(Tokens.e6),
+                              sombra: Tokens.sombraMedia,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  CampoTexto(
+                                    controlador: _controladorCorreo,
+                                    etiqueta: 'Correo electrónico',
+                                    pista: 'tucorreo@ejemplo.com',
+                                    icono: Icons.alternate_email_rounded,
+                                    teclado: TextInputType.emailAddress,
+                                    validador: (v) => (v ?? '').contains('@')
+                                        ? null
+                                        : 'Ingresa un correo válido',
+                                  ),
+                                  const SizedBox(height: Tokens.e5),
+                                  CampoTexto(
+                                    controlador: _controladorContrasena,
+                                    etiqueta: 'Contraseña',
+                                    pista: '••••••••',
+                                    icono: Icons.lock_outline_rounded,
+                                    esClave: _ocultarContrasena,
+                                    alEnviar: (_) => _iniciarSesion(),
+                                    sufijo: IconButton(
+                                      icon: Icon(
+                                        _ocultarContrasena
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                        size: 19,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _ocultarContrasena =
+                                            !_ocultarContrasena,
+                                      ),
+                                    ),
+                                    validador: (v) => (v ?? '').length < 6
+                                        ? 'Mínimo 6 caracteres'
+                                        : null,
+                                  ),
+                                  const SizedBox(height: Tokens.e4),
+                                  Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: Checkbox(
+                                          value: _recordarContrasena,
+                                          onChanged: (val) => setState(
+                                            () => _recordarContrasena =
+                                                val ?? false,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: Tokens.e3),
+                                      Expanded(
+                                        child: GestureDetector(
+                                          onTap: () => setState(
+                                            () => _recordarContrasena =
+                                                !_recordarContrasena,
+                                          ),
+                                          child: Text(
+                                            'Recordarme en este dispositivo',
+                                            style: tema.textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: Tokens.tintaMedia,
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Avisos.mostrar(
+                                          context,
+                                          mensaje:
+                                              'Escríbenos por el chat y te '
+                                              'ayudamos a recuperarla.',
+                                        ),
+                                        child: const Text('¿La olvidaste?'),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ).animate().fadeIn(delay: 200.ms, duration: 500.ms)
+                                .slideY(begin: 0.1, curve: Curves.easeOutCubic),
+
+                            const SizedBox(height: Tokens.e6),
+
+                            BotonPrincipal(
+                              texto: 'Entrar',
+                              icono: Icons.arrow_forward_rounded,
+                              cargando: _cargando,
+                              alPresionar: _iniciarSesion,
+                            ).animate().fadeIn(delay: 320.ms).slideY(
+                              begin: 0.24,
+                              curve: Curves.easeOutCubic,
+                            ),
+
+                            const SizedBox(height: Tokens.e6),
+
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  '¿Aún no tienes cuenta?',
+                                  style: tema.textTheme.bodySmall,
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const PantallaRegistroUsuario(),
+                                    ),
+                                  ),
+                                  child: const Text('Regístrate'),
+                                ),
+                              ],
+                            ).animate().fadeIn(delay: 420.ms),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
-                ).animate().slideY(begin: 0.5, delay: 400.ms, duration: 500.ms).fadeIn(),
-              ],
-            ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

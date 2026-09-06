@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../../../repositorios/repositorio_autenticacion.dart';
-import '../../../../repositorios/repositorio_almacenamiento.dart';
+import '../../../nucleo/tema/tokens_app.dart';
+import '../../../repositorios/repositorio_almacenamiento.dart';
+import '../../../repositorios/repositorio_autenticacion.dart';
+import '../../widgets/componentes.dart';
 
 class PantallaRegistroUsuario extends ConsumerStatefulWidget {
   const PantallaRegistroUsuario({super.key});
@@ -25,9 +27,21 @@ class _PantallaRegistroUsuarioState
   final _controladorContrasena = TextEditingController();
 
   bool _cargando = false;
+  bool _ocultarContrasena = true;
   File? _fotoPerfil;
   File? _fotoCedula;
   final _picker = ImagePicker();
+
+  @override
+  void dispose() {
+    _controladorNombre.dispose();
+    _controladorCedula.dispose();
+    _controladorTelefono.dispose();
+    _controladorDireccion.dispose();
+    _controladorCorreo.dispose();
+    _controladorContrasena.dispose();
+    super.dispose();
+  }
 
   Future<void> _seleccionarFotoPerfil() async {
     final XFile? imagen = await _picker.pickImage(
@@ -52,8 +66,9 @@ class _PantallaRegistroUsuarioState
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) return;
     if (_fotoPerfil == null || _fotoCedula == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, selecciona tu foto de perfil y captura tu cédula')),
+      Avisos.atencion(
+        context,
+        'Añade tu foto de perfil y la captura de tu cédula.',
       );
       return;
     }
@@ -63,9 +78,11 @@ class _PantallaRegistroUsuarioState
       final repoAuth = ref.read(proveedorRepositorioAutenticacion);
       final repoAlmacenamiento = ref.read(proveedorRepositorioAlmacenamiento);
 
-      // 1. Subir fotos de forma paralela (perfil y cédula)
+      // 1. Subir fotos (perfil y cédula)
       final urlFoto = await repoAlmacenamiento.subirArchivoPerfil(_fotoPerfil!);
-      final urlCedula = await repoAlmacenamiento.subirArchivoCedula(_fotoCedula!);
+      final urlCedula = await repoAlmacenamiento.subirArchivoCedula(
+        _fotoCedula!,
+      );
 
       // 2. Registrar usuario y guardar todos los datos en tabla 'clientes'
       await repoAuth.registrarUsuario(
@@ -80,54 +97,31 @@ class _PantallaRegistroUsuarioState
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: const [
-                Icon(Icons.check_circle_rounded, color: Colors.white),
-                SizedBox(width: 12),
-                Expanded(child: Text('¡Registro exitoso! Bienvenido a Pasteleria M&G.', style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-            ),
-            backgroundColor: Colors.green.shade600,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          ),
+        Avisos.exito(
+          context,
+          '¡Registro exitoso! Te damos la bienvenida a Pastelería M&G.',
         );
-        
+
         // Pequeña pausa para que el usuario lea el mensaje
         await Future.delayed(const Duration(milliseconds: 1500));
-        
+
         if (mounted) {
-          Navigator.pushNamedAndRemoveUntil(context, '/inicial', (route) => false);
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/inicial',
+            (route) => false,
+          );
         }
       }
     } catch (e) {
       if (mounted) {
-        String mensajeError = 'Ocurrió un error inesperado.';
         final errorStr = e.toString().toLowerCase();
-        
-        if (errorStr.contains('already registered') || errorStr.contains('user_already_exists')) {
-          mensajeError = 'Este correo ya está registrado. Por favor, inicia sesión.';
-        } else {
-          mensajeError = 'Error: ${e.toString()}';
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text(mensajeError)),
-              ],
-            ),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            duration: const Duration(seconds: 4),
-          ),
-        );
+        final mensajeError =
+            errorStr.contains('already registered') ||
+                errorStr.contains('user_already_exists')
+            ? 'Este correo ya está registrado. Inicia sesión.'
+            : 'Error: ${e.toString()}';
+        Avisos.error(context, mensajeError);
       }
     } finally {
       if (mounted) setState(() => _cargando = false);
@@ -137,243 +131,216 @@ class _PantallaRegistroUsuarioState
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-    
+
     return Scaffold(
-      backgroundColor: tema.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        iconTheme: IconThemeData(color: tema.colorScheme.primary),
-        title: Text(
-          'Crear Cuenta',
-          style: GoogleFonts.outfit(
-            color: tema.colorScheme.primary,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                Text(
-                  '¡Únete a la dulzura!',
-                  style: GoogleFonts.outfit(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: tema.textTheme.displayLarge?.color,
-                  ),
+      body: FondoAtelier(
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.e5,
+                  Tokens.e3,
+                  Tokens.e5,
+                  0,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Completa tus datos para disfrutar de nuestros deliciosos postres',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    color: tema.textTheme.bodyMedium?.color,
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Selector de Imagen
-                GestureDetector(
-                  onTap: _seleccionarFotoPerfil,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: tema.colorScheme.primaryContainer,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: tema.colorScheme.primary, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: tema.colorScheme.primary.withAlpha(50),
-                          blurRadius: 15,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
+                child: Row(
+                  children: [
+                    BotonCircular(
+                      icono: Icons.arrow_back_rounded,
+                      tooltip: 'Volver',
+                      alPresionar: () => Navigator.maybePop(context),
                     ),
-                    child: _fotoPerfil != null
-                        ? ClipOval(
-                            child: Image.file(
-                              _fotoPerfil!,
-                              fit: BoxFit.cover,
+                    const Spacer(),
+                    const Antetitulo('Nueva cuenta'),
+                    const Spacer(),
+                    const SizedBox(width: 42),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    Tokens.e6,
+                    Tokens.e6,
+                    Tokens.e6,
+                    Tokens.e12,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 460),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Únete a la casa',
+                              textAlign: TextAlign.center,
+                              style: tema.textTheme.displaySmall,
                             ),
-                          )
-                        : Icon(
-                            Icons.person_add_rounded,
-                            size: 40,
-                            color: tema.colorScheme.primary,
-                          ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _seleccionarFotoPerfil,
-                  child: Text(
-                    'Elegir foto de perfil',
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      color: tema.colorScheme.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                            const SizedBox(height: Tokens.e3),
+                            Text(
+                              'Necesitamos unos datos para habilitar tus '
+                              'pedidos y tu línea del Club M&G.',
+                              textAlign: TextAlign.center,
+                              style: tema.textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: Tokens.e8),
 
-                // Nombre
-                _CampoTexto(
-                  controlador: _controladorNombre,
-                  etiqueta: 'Nombre completo',
-                  icono: Icons.person_outline_rounded,
-                  validador: (v) => v!.isEmpty ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 16),
-                
-                // Cédula
-                _CampoTexto(
-                  controlador: _controladorCedula,
-                  etiqueta: 'Número de Cédula',
-                  icono: Icons.badge_outlined,
-                  teclado: TextInputType.number,
-                  validador: (v) => v!.isEmpty ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 16),
-                
-                // Captura Fotográfica de Cédula
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: tema.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: tema.colorScheme.outlineVariant.withAlpha(100), width: 1.5),
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        'Foto de Cédula (Frontal)',
-                        style: GoogleFonts.outfit(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: tema.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      GestureDetector(
-                        onTap: _seleccionarFotoCedula,
-                        child: Container(
-                          height: 150,
-                          width: double.infinity,
-                          decoration: BoxDecoration(
-                            color: tema.colorScheme.primaryContainer.withAlpha(100),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: tema.colorScheme.primary.withAlpha(50), width: 2),
-                          ),
-                          child: _fotoCedula != null
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: Image.file(
-                                    _fotoCedula!,
-                                    fit: BoxFit.cover,
-                                  ),
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.camera_front_rounded,
-                                      size: 48,
-                                      color: tema.colorScheme.primary,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Tocar para tomar foto',
-                                      style: GoogleFonts.inter(
-                                        color: tema.colorScheme.primary,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
+                            // ── Retrato ────────────────────────────
+                            Center(
+                              child: _SelectorRetrato(
+                                archivo: _fotoPerfil,
+                                alTocar: _seleccionarFotoPerfil,
+                              ),
+                            ),
+                            const SizedBox(height: Tokens.e3),
+                            Center(
+                              child: TextButton(
+                                onPressed: _seleccionarFotoPerfil,
+                                child: Text(
+                                  _fotoPerfil == null
+                                      ? 'Añadir foto de perfil'
+                                      : 'Cambiar foto de perfil',
                                 ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Teléfono
-                _CampoTexto(
-                  controlador: _controladorTelefono,
-                  etiqueta: 'Teléfono celular',
-                  icono: Icons.phone_android_rounded,
-                  teclado: TextInputType.phone,
-                  validador: (v) => v!.isEmpty ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 16),
-                
-                // Dirección
-                _CampoTexto(
-                  controlador: _controladorDireccion,
-                  etiqueta: 'Dirección de domicilio',
-                  icono: Icons.home_outlined,
-                  maxLines: 2,
-                  validador: (v) => v!.isEmpty ? 'Requerido' : null,
-                ),
-                const SizedBox(height: 16),
-                
-                // Correo
-                _CampoTexto(
-                  controlador: _controladorCorreo,
-                  etiqueta: 'Correo electrónico',
-                  icono: Icons.email_outlined,
-                  teclado: TextInputType.emailAddress,
-                  validador: (v) => v!.contains('@') ? null : 'Correo inválido',
-                ),
-                const SizedBox(height: 16),
-                
-                // Contraseña
-                _CampoTexto(
-                  controlador: _controladorContrasena,
-                  etiqueta: 'Contraseña',
-                  icono: Icons.lock_outline_rounded,
-                  esClave: true,
-                  validador: (v) => v!.length < 6 ? 'Mínimo 6 caracteres' : null,
-                ),
-                
-                const SizedBox(height: 32),
-
-                // Botón Registrar
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: _cargando ? null : _registrar,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: tema.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 4,
-                      shadowColor: tema.colorScheme.primary.withAlpha(100),
-                    ),
-                    child: _cargando
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : Text(
-                            'Crear Mi Cuenta',
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1,
+                              ),
                             ),
-                          ),
+
+                            const SizedBox(height: Tokens.e8),
+
+                            // ── Identidad ──────────────────────────
+                            _Seccion(
+                              antetitulo: 'Paso 1',
+                              titulo: 'Tu identidad',
+                              hijos: [
+                                CampoTexto(
+                                  controlador: _controladorNombre,
+                                  etiqueta: 'Nombre completo',
+                                  pista: 'Nombre y apellido',
+                                  icono: Icons.person_outline_rounded,
+                                  validador: (v) => (v ?? '').trim().isEmpty
+                                      ? 'Requerido'
+                                      : null,
+                                ),
+                                CampoTexto(
+                                  controlador: _controladorCedula,
+                                  etiqueta: 'Número de cédula',
+                                  pista: 'Solo dígitos',
+                                  icono: Icons.badge_outlined,
+                                  teclado: TextInputType.number,
+                                  validador: (v) => (v ?? '').trim().isEmpty
+                                      ? 'Requerido'
+                                      : null,
+                                ),
+                                _CapturaCedula(
+                                  archivo: _fotoCedula,
+                                  alTocar: _seleccionarFotoCedula,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: Tokens.e5),
+
+                            // ── Contacto ───────────────────────────
+                            _Seccion(
+                              antetitulo: 'Paso 2',
+                              titulo: 'Dónde te encontramos',
+                              hijos: [
+                                CampoTexto(
+                                  controlador: _controladorTelefono,
+                                  etiqueta: 'Teléfono celular',
+                                  pista: '0412 000 0000',
+                                  icono: Icons.phone_iphone_rounded,
+                                  teclado: TextInputType.phone,
+                                  validador: (v) => (v ?? '').trim().isEmpty
+                                      ? 'Requerido'
+                                      : null,
+                                ),
+                                CampoTexto(
+                                  controlador: _controladorDireccion,
+                                  etiqueta: 'Dirección de entrega',
+                                  pista: 'Calle, edificio, referencia',
+                                  icono: Icons.location_on_outlined,
+                                  maxLineas: 2,
+                                  validador: (v) => (v ?? '').trim().isEmpty
+                                      ? 'Requerido'
+                                      : null,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: Tokens.e5),
+
+                            // ── Acceso ─────────────────────────────
+                            _Seccion(
+                              antetitulo: 'Paso 3',
+                              titulo: 'Datos de acceso',
+                              hijos: [
+                                CampoTexto(
+                                  controlador: _controladorCorreo,
+                                  etiqueta: 'Correo electrónico',
+                                  pista: 'tucorreo@ejemplo.com',
+                                  icono: Icons.alternate_email_rounded,
+                                  teclado: TextInputType.emailAddress,
+                                  validador: (v) => (v ?? '').contains('@')
+                                      ? null
+                                      : 'Ingresa un correo válido',
+                                ),
+                                CampoTexto(
+                                  controlador: _controladorContrasena,
+                                  etiqueta: 'Contraseña',
+                                  pista: 'Mínimo 6 caracteres',
+                                  icono: Icons.lock_outline_rounded,
+                                  esClave: _ocultarContrasena,
+                                  sufijo: IconButton(
+                                    icon: Icon(
+                                      _ocultarContrasena
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                      size: 19,
+                                    ),
+                                    onPressed: () => setState(
+                                      () => _ocultarContrasena =
+                                          !_ocultarContrasena,
+                                    ),
+                                  ),
+                                  validador: (v) => (v ?? '').length < 6
+                                      ? 'Mínimo 6 caracteres'
+                                      : null,
+                                ),
+                              ],
+                            ),
+
+                            const SizedBox(height: Tokens.e6),
+
+                            const Aviso(
+                              titulo: 'Tus datos están protegidos',
+                              detalle:
+                                  'Usamos tu cédula únicamente para verificar '
+                                  'tu identidad al financiar pedidos.',
+                              icono: Icons.verified_user_outlined,
+                              color: Tokens.salviaProfundo,
+                              fondo: Tokens.salviaSuave,
+                            ),
+
+                            const SizedBox(height: Tokens.e6),
+
+                            BotonPrincipal(
+                              texto: 'Crear mi cuenta',
+                              icono: Icons.auto_awesome_rounded,
+                              cargando: _cargando,
+                              alPresionar: _registrar,
+                            ),
+                          ],
+                        ).animate().fadeIn(duration: 400.ms),
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 40),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -381,38 +348,156 @@ class _PantallaRegistroUsuarioState
   }
 }
 
-class _CampoTexto extends StatelessWidget {
-  final TextEditingController controlador;
-  final String etiqueta;
-  final IconData icono;
-  final bool esClave;
-  final TextInputType teclado;
-  final int maxLines;
-  final String? Function(String?)? validador;
+/// Agrupador visual de campos con antetítulo y título.
+class _Seccion extends StatelessWidget {
+  final String antetitulo;
+  final String titulo;
+  final List<Widget> hijos;
 
-  const _CampoTexto({
-    required this.controlador,
-    required this.etiqueta,
-    required this.icono,
-    this.esClave = false,
-    this.teclado = TextInputType.text,
-    this.maxLines = 1,
-    this.validador,
+  const _Seccion({
+    required this.antetitulo,
+    required this.titulo,
+    required this.hijos,
   });
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controlador,
-      obscureText: esClave,
-      keyboardType: teclado,
-      maxLines: esClave ? 1 : maxLines,
-      validator: validador,
-      decoration: InputDecoration(
-        labelText: etiqueta,
-        prefixIcon: Icon(icono),
-        filled: true,
+    return TarjetaSuave(
+      padding: const EdgeInsets.all(Tokens.e5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          EncabezadoSeccion(antetitulo: antetitulo, titulo: titulo),
+          const SizedBox(height: Tokens.e5),
+          for (int i = 0; i < hijos.length; i++) ...[
+            if (i > 0) const SizedBox(height: Tokens.e5),
+            hijos[i],
+          ],
+        ],
       ),
+    );
+  }
+}
+
+/// Avatar circular con borde punteado sutil para elegir el retrato.
+class _SelectorRetrato extends StatelessWidget {
+  final File? archivo;
+  final VoidCallback alTocar;
+
+  const _SelectorRetrato({required this.archivo, required this.alTocar});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: alTocar,
+      child: Container(
+        width: 116,
+        height: 116,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Tokens.superficie,
+          border: Border.all(color: Tokens.lineaFuerte, width: 1.5),
+          boxShadow: Tokens.sombraSuave,
+        ),
+        padding: const EdgeInsets.all(5),
+        child: ClipOval(
+          child: archivo != null
+              ? Image.file(
+                  archivo!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  height: double.infinity,
+                )
+              : Container(
+                  color: Tokens.rosaVelo,
+                  child: const Icon(
+                    Icons.add_a_photo_outlined,
+                    size: 30,
+                    color: Tokens.rosa,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Zona de captura de la cédula con estado vacío/lleno diferenciado.
+class _CapturaCedula extends StatelessWidget {
+  final File? archivo;
+  final VoidCallback alTocar;
+
+  const _CapturaCedula({required this.archivo, required this.alTocar});
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: Tokens.e2),
+          child: Row(
+            children: [
+              Text(
+                'Cédula (frontal)',
+                style: tema.textTheme.labelMedium?.copyWith(
+                  color: Tokens.tintaMedia,
+                ),
+              ),
+              const Spacer(),
+              if (archivo != null)
+                const Pildora(
+                  texto: 'Listo',
+                  icono: Icons.check_rounded,
+                  color: Tokens.exito,
+                  compacta: true,
+                ),
+            ],
+          ),
+        ),
+        GestureDetector(
+          onTap: alTocar,
+          child: Container(
+            height: 160,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: archivo == null ? Tokens.superficieSuave : Colors.white,
+              borderRadius: BorderRadius.circular(Tokens.radioSm),
+              border: Border.all(
+                color: archivo == null ? Tokens.lineaFuerte : Tokens.exito,
+              ),
+            ),
+            child: archivo != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(Tokens.radioSm - 1),
+                    child: Image.file(archivo!, fit: BoxFit.cover),
+                  )
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.photo_camera_outlined,
+                        size: 30,
+                        color: Tokens.tintaSuave,
+                      ),
+                      const SizedBox(height: Tokens.e3),
+                      Text(
+                        'Toca para tomar la foto',
+                        style: tema.textTheme.titleSmall?.copyWith(
+                          color: Tokens.tintaMedia,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Asegúrate de que se lea con claridad',
+                        style: tema.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,12 +1,13 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'nucleo/constantes/entorno.dart';
 import 'nucleo/tema/tema_app.dart';
+import 'presentacion/pantallas/autenticacion/pantalla_registro_usuario.dart';
 import 'presentacion/pantallas/bienvenida/pantalla_bienvenida.dart';
 import 'presentacion/pantallas/pantalla_inicial.dart';
-import 'presentacion/pantallas/autenticacion/pantalla_registro_usuario.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,17 +25,32 @@ void main() async {
   runApp(const ProviderScope(child: AplicacionSweetBites()));
 }
 
+/// Permite arrastrar con el ratón y el trackpad, no sólo con el dedo.
+/// Sin esto, el scroll en la versión web se siente rígido.
+class ComportamientoScroll extends MaterialScrollBehavior {
+  const ComportamientoScroll();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {
+    PointerDeviceKind.touch,
+    PointerDeviceKind.mouse,
+    PointerDeviceKind.trackpad,
+    PointerDeviceKind.stylus,
+  };
+}
+
 class AplicacionSweetBites extends StatelessWidget {
   const AplicacionSweetBites({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pasteleria M&G',
+      title: 'Pastelería M&G',
       debugShowCheckedModeBanner: false,
       theme: TemaApp.temaClaro,
       darkTheme: TemaApp.temaOscuro,
       themeMode: ThemeMode.light,
+      scrollBehavior: const ComportamientoScroll(),
       initialRoute: '/',
       routes: {
         '/': (context) => const PantallaBienvenida(),

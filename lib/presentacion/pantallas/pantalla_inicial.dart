@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
+import '../../nucleo/constantes/entorno.dart';
+import '../../nucleo/tema/tokens_app.dart';
+import '../../proveedores/proveedor_carrito.dart';
 import '../../proveedores/supabase_proveedor.dart';
 import '../../repositorios/repositorio_productos.dart';
-import '../../proveedores/proveedor_carrito.dart';
+import '../widgets/componentes.dart';
 import 'pantalla_carrito.dart';
 import 'pantalla_chat.dart';
 import 'pantalla_club_mg.dart';
 import 'pantalla_perfil.dart';
-import '../../nucleo/constantes/entorno.dart';
-import 'package:uuid/uuid.dart';
 
 class PantallaInicial extends ConsumerStatefulWidget {
   const PantallaInicial({super.key});
@@ -116,402 +117,430 @@ class _PantallaInicialState extends ConsumerState<PantallaInicial> {
 
   String _obtenerIniciales() {
     if (_nombreUsuario.isEmpty || _nombreUsuario == 'Invitado') return 'I';
-    final partes = _nombreUsuario.split(' ');
-    if (partes.length > 1) {
+    final partes = _nombreUsuario.trim().split(' ');
+    if (partes.length > 1 && partes[1].isNotEmpty) {
       return '${partes[0][0]}${partes[1][0]}'.toUpperCase();
     }
     return _nombreUsuario.substring(0, 1).toUpperCase();
   }
 
+  Future<void> _abrirChat() async {
+    setState(() => _cargandoChat = true);
+    _idConversacion ??= const Uuid().v4();
+    setState(() => _cargandoChat = false);
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PantallaChat(
+          idNegocio: Entorno.idSweetBites,
+          idConversacion: _idConversacion!,
+        ),
+      ),
+    );
+    _cargarConversacionActiva();
+  }
+
+  void _abrirCarrito() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const PantallaCarrito()),
+  );
+
   @override
   Widget build(BuildContext context) {
-    final tema = Theme.of(context);
     final itemsCarrito = ref.watch(proveedorCarrito);
     final cantidadCarrito = itemsCarrito.fold(
       0,
       (sum, item) => sum + item.cantidad,
     );
+    final totalCarrito = itemsCarrito.fold(
+      0.0,
+      (sum, item) => sum + item.subtotal,
+    );
 
     return Scaffold(
-      backgroundColor: tema.scaffoldBackgroundColor,
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            UserAccountsDrawerHeader(
-              decoration: BoxDecoration(color: tema.colorScheme.primary),
-              accountName: Text(
-                _nombreUsuario,
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+      drawer: _CajonNavegacion(
+        nombre: _nombreUsuario,
+        correo: ref.read(supabaseProveedor).auth.currentUser?.email ?? '',
+        fotoUrl: _fotoPerfilUrl,
+        iniciales: _obtenerIniciales(),
+      ),
+      body: FondoAtelier(
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // ── Cabecera editorial ───────────────────────────────
+            SliverAppBar(
+              expandedHeight: 268,
+              pinned: true,
+              stretch: true,
+              backgroundColor: Tokens.lienzo,
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              automaticallyImplyLeading: false,
+              flexibleSpace: FlexibleSpaceBar(
+                background: _CabeceraInicio(
+                  saludo: _saludo,
+                  nombre: _nombreUsuario,
+                  fotoUrl: _fotoPerfilUrl,
+                  iniciales: _obtenerIniciales(),
+                  cantidadCarrito: cantidadCarrito,
+                  alAbrirCarrito: _abrirCarrito,
+                ),
               ),
-              accountEmail: Text(
-                ref.read(supabaseProveedor).auth.currentUser?.email ?? '',
-                style: GoogleFonts.inter(),
-              ),
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: tema.colorScheme.surface,
-                backgroundImage: _fotoPerfilUrl != null
-                    ? NetworkImage(_fotoPerfilUrl!)
-                    : null,
-                child: _fotoPerfilUrl == null
-                    ? Text(
-                        _obtenerIniciales(),
-                        style: GoogleFonts.outfit(
-                          color: tema.colorScheme.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 24,
-                        ),
-                      )
-                    : null,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(62),
+                child: Container(
+                  height: 62,
+                  alignment: Alignment.centerLeft,
+                  color: Tokens.lienzo,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Tokens.e5,
+                      vertical: Tokens.e2 + 2,
+                    ),
+                    itemCount: _categorias.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(width: Tokens.e2 + 2),
+                    itemBuilder: (context, index) {
+                      final cat = _categorias[index];
+                      return _ChipFiltro(
+                        etiqueta: cat,
+                        seleccionado: _filtroCategoria == cat,
+                        onTap: () => setState(() => _filtroCategoria = cat),
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.person, color: Colors.blueAccent),
-              title: const Text(
-                'Mi Perfil',
-                style: TextStyle(fontWeight: FontWeight.bold),
+
+            // ── Título de la carta ───────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.e5,
+                  Tokens.e5,
+                  Tokens.e5,
+                  Tokens.e4,
+                ),
+                child: EncabezadoSeccion(
+                  antetitulo: 'Nuestra carta',
+                  titulo: _filtroCategoria == 'Todos'
+                      ? 'Selección de la casa'
+                      : _filtroCategoria,
+                  descripcion: 'Horneado esta mañana, en cantidades limitadas.',
+                ),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PantallaPerfil()),
-                );
-              },
             ),
-            ListTile(
-              leading: const Icon(Icons.star_rounded, color: Colors.amber),
-              title: const Text(
-                'Club M&G (Mis Cuotas)',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              onTap: () {
-                Navigator.pop(context); // Cerrar drawer
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PantallaClubMg()),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text(
-                'Cerrar sesión',
-                style: TextStyle(color: Colors.red),
-              ),
-              onTap: () async {
-                await ref.read(supabaseProveedor).auth.signOut();
-                if (context.mounted) {
-                  Navigator.of(context).pushReplacementNamed('/');
+
+            // ── Catálogo ─────────────────────────────────────────
+            StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _productosStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const SliverPadding(
+                    padding: EdgeInsets.symmetric(horizontal: Tokens.e5),
+                    sliver: SliverToBoxAdapter(child: _EsqueletoCatalogo()),
+                  );
                 }
+                if (snapshot.hasError) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: EstadoVacio(
+                      icono: Icons.cloud_off_rounded,
+                      titulo: 'No pudimos cargar la carta',
+                      mensaje: '${snapshot.error}',
+                    ),
+                  );
+                }
+
+                final productos = snapshot.data ?? [];
+                final productosFiltrados = _filtroCategoria == 'Todos'
+                    ? productos
+                    : productos
+                          .where(
+                            (p) =>
+                                p['categoria']?.toString().toLowerCase() ==
+                                _filtroCategoria.toLowerCase(),
+                          )
+                          .toList();
+
+                if (productosFiltrados.isEmpty) {
+                  return const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: EstadoVacio(
+                      icono: Icons.bakery_dining_outlined,
+                      titulo: 'Nada por aquí, todavía',
+                      mensaje:
+                          'No hay piezas disponibles en esta categoría. '
+                          'Vuelve a mirar en un rato.',
+                    ),
+                  );
+                }
+
+                return SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    Tokens.e5,
+                    0,
+                    Tokens.e5,
+                    cantidadCarrito > 0 ? 140 : 110,
+                  ),
+                  sliver: SliverList.separated(
+                    itemCount: productosFiltrados.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: Tokens.e6),
+                    itemBuilder: (context, index) {
+                      return _TarjetaProducto(
+                            producto: productosFiltrados[index],
+                          )
+                          .animate()
+                          .fadeIn(
+                            duration: 450.ms,
+                            delay: (index.clamp(0, 6) * 70).ms,
+                          )
+                          .slideY(begin: 0.08, curve: Curves.easeOutCubic);
+                    },
+                  ),
+                );
               },
             ),
           ],
         ),
       ),
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          // Cabecera Macaron Theme
-          SliverAppBar(
-            expandedHeight: 280,
-            floating: false,
-            pinned: true,
-            backgroundColor: tema.scaffoldBackgroundColor,
-            elevation: 0,
-            // Quitamos el title estático para que no se superponga con el contenido
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      tema.colorScheme.primaryContainer,
-                      tema.colorScheme.tertiaryContainer,
-                    ],
-                  ),
-                ),
-                child: SafeArea(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 10),
-                      // Título centralizado
-                      Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.cake_rounded,
-                                size: 28,
-                                color: tema.colorScheme.primary,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Pasteleria M&G',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 28,
-                                  color: tema.colorScheme.primary,
-                                  letterSpacing: -0.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          )
-                          .animate()
-                          .slideY(begin: -0.2, duration: 600.ms)
-                          .fadeIn(),
-                      const Spacer(),
-                      // Tarjeta de bienvenida
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 20),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: tema.colorScheme.surface.withAlpha(200),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withAlpha(10),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 30,
-                              backgroundColor: tema.colorScheme.primary,
-                              backgroundImage: _fotoPerfilUrl != null
-                                  ? NetworkImage(_fotoPerfilUrl!)
-                                  : null,
-                              child: _fotoPerfilUrl == null
-                                  ? Text(
-                                      _obtenerIniciales(),
-                                      style: GoogleFonts.outfit(
-                                        color: Colors.white,
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '$_saludo,',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      color: tema.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  Text(
-                                    _nombreUsuario,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: tema.colorScheme.onSurface,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ).animate().scale(
-                        duration: 800.ms,
-                        curve: Curves.easeOutBack,
-                      ),
-                      const Spacer(flex: 2),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(70),
-              child: Container(
-                height: 70,
-                padding: const EdgeInsets.only(bottom: 16, top: 8),
-                decoration: BoxDecoration(
-                  color: tema.scaffoldBackgroundColor,
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(30),
-                  ),
-                ),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _categorias.length,
-                  itemBuilder: (context, index) {
-                    final cat = _categorias[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: _ChipFiltro(
-                        etiqueta: cat,
-                        seleccionado: _filtroCategoria == cat,
-                        onTap: () => setState(() => _filtroCategoria = cat),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
+
+      floatingActionButton: _BotonChat(
+        cargando: _cargandoChat,
+        alPresionar: _abrirChat,
+      ),
+
+      bottomNavigationBar: _BarraCarrito(
+        cantidad: cantidadCarrito,
+        total: totalCarrito,
+        alPresionar: _abrirCarrito,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────── Cabecera ───────────────────────────
+
+class _CabeceraInicio extends StatelessWidget {
+  final String saludo;
+  final String nombre;
+  final String? fotoUrl;
+  final String iniciales;
+  final int cantidadCarrito;
+  final VoidCallback alAbrirCarrito;
+
+  const _CabeceraInicio({
+    required this.saludo,
+    required this.nombre,
+    required this.fotoUrl,
+    required this.iniciales,
+    required this.cantidadCarrito,
+    required this.alAbrirCarrito,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: Tokens.degradadoAmanecer,
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(Tokens.radioXl),
+        ),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            Tokens.e5,
+            Tokens.e3,
+            Tokens.e5,
+            Tokens.e6,
           ),
-
-          // Catálogo de Productos
-          StreamBuilder<List<Map<String, dynamic>>>(
-            stream: _productosStream,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverFillRemaining(
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (snapshot.hasError) {
-                return SliverFillRemaining(
-                  child: Center(child: Text('Error: ${snapshot.error}')),
-                );
-              }
-
-              final productos = snapshot.data ?? [];
-
-              final productosFiltrados = _filtroCategoria == 'Todos'
-                  ? productos
-                  : productos
-                        .where(
-                          (p) =>
-                              p['categoria']?.toString().toLowerCase() ==
-                              _filtroCategoria.toLowerCase(),
-                        )
-                        .toList();
-
-              if (productosFiltrados.isEmpty) {
-                return SliverFillRemaining(
-                  child: Center(
+          child: Column(
+            children: [
+              // Barra superior: menú · marca · carrito
+              Row(
+                children: [
+                  Builder(
+                    builder: (context) => BotonCircular(
+                      icono: Icons.menu_rounded,
+                      tooltip: 'Menú',
+                      alPresionar: () => Scaffold.of(context).openDrawer(),
+                    ),
+                  ),
+                  Expanded(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.cookie_outlined,
-                          size: 80,
-                          color: tema.colorScheme.primary.withAlpha(100),
-                        ),
-                        const SizedBox(height: 16),
                         Text(
-                          'No hay postres en esta categoría',
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: tema.textTheme.bodyMedium?.color,
+                          'PASTELERÍA',
+                          style: tema.textTheme.labelSmall?.copyWith(
+                            letterSpacing: 3,
+                            color: Tokens.rosaProfundo,
+                          ),
+                        ),
+                        Text(
+                          'M&G',
+                          style: tema.textTheme.headlineMedium?.copyWith(
+                            letterSpacing: 1,
                           ),
                         ),
                       ],
                     ),
                   ),
-                );
-              }
-
-              return SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 8,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    final producto = productosFiltrados[index];
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 32),
-                      child: _TarjetaProductoIrresistible(producto: producto)
-                          .animate()
-                          .slideY(
-                            begin: 0.1,
-                            duration: 500.ms,
-                            delay: (index * 100).ms,
-                          )
-                          .fadeIn(),
-                    );
-                  }, childCount: productosFiltrados.length),
-                ),
-              );
-            },
-          ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          // Botón del Chat IA (Siempre visible)
-          FloatingActionButton.extended(
-            heroTag: 'chat_ia',
-            onPressed: () async {
-              setState(() => _cargandoChat = true);
-              _idConversacion ??= const Uuid().v4();
-              setState(() => _cargandoChat = false);
-
-              if (!mounted) return;
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => PantallaChat(
-                    idNegocio: Entorno.idSweetBites,
-                    idConversacion: _idConversacion!,
+                  _BotonCarritoCabecera(
+                    cantidad: cantidadCarrito,
+                    alPresionar: alAbrirCarrito,
                   ),
-                ),
-              );
-              _cargarConversacionActiva();
-            },
-            backgroundColor: tema.colorScheme.tertiary,
-            foregroundColor: tema.colorScheme.onTertiary,
-            icon: _cargandoChat
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.auto_awesome),
-            label: Text(
-              'Atención al Cliente',
-              style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
-            ),
-          ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
-
-          if (cantidadCarrito > 0) const SizedBox(height: 16),
-
-          // Botón del Carrito (Solo si hay items)
-          if (cantidadCarrito > 0)
-            FloatingActionButton.extended(
-              heroTag: 'carrito',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const PantallaCarrito()),
-                );
-              },
-              backgroundColor: tema.colorScheme.primary,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.shopping_cart_rounded),
-              label: Text(
-                '$cantidadCarrito items',
-                style: GoogleFonts.outfit(fontWeight: FontWeight.bold),
+                ],
               ),
-            ).animate().scale(duration: 300.ms, curve: Curves.easeOutBack),
-        ],
+
+              const Spacer(),
+
+              // Saludo personalizado
+              TarjetaSuave(
+                padding: const EdgeInsets.all(Tokens.e4),
+                sombra: Tokens.sombraMedia,
+                colorBorde: Colors.white,
+                child: Row(
+                  children: [
+                    _Retrato(
+                      fotoUrl: fotoUrl,
+                      iniciales: iniciales,
+                      radio: 26,
+                    ),
+                    const SizedBox(width: Tokens.e4),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            saludo,
+                            style: tema.textTheme.labelSmall?.copyWith(
+                              letterSpacing: 1.6,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            nombre,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: tema.textTheme.headlineSmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Pildora(
+                      texto: 'Club M&G',
+                      icono: Icons.workspace_premium_rounded,
+                      color: Tokens.arenaProfundo,
+                      compacta: true,
+                    ),
+                  ],
+                ),
+              ).animate().fadeIn(duration: 500.ms).slideY(
+                begin: 0.16,
+                curve: Curves.easeOutCubic,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
+
+class _BotonCarritoCabecera extends StatelessWidget {
+  final int cantidad;
+  final VoidCallback alPresionar;
+
+  const _BotonCarritoCabecera({
+    required this.cantidad,
+    required this.alPresionar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        BotonCircular(
+          icono: Icons.shopping_bag_outlined,
+          tooltip: 'Mi carrito',
+          alPresionar: alPresionar,
+        ),
+        if (cantidad > 0)
+          Positioned(
+            right: -2,
+            top: -2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Tokens.rosa,
+                borderRadius: BorderRadius.circular(Tokens.radioPildora),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text(
+                '$cantidad',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  color: Colors.white,
+                  fontSize: 10,
+                  letterSpacing: 0,
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _Retrato extends StatelessWidget {
+  final String? fotoUrl;
+  final String iniciales;
+  final double radio;
+
+  const _Retrato({
+    required this.fotoUrl,
+    required this.iniciales,
+    this.radio = 24,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Tokens.linea, width: 1.5),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: CircleAvatar(
+        radius: radio,
+        backgroundColor: Tokens.rosaVelo,
+        backgroundImage: fotoUrl != null ? NetworkImage(fotoUrl!) : null,
+        child: fotoUrl == null
+            ? Text(
+                iniciales,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Tokens.rosaProfundo,
+                  fontSize: radio * 0.72,
+                ),
+              )
+            : null,
+      ),
+    );
+  }
+}
+
+// ─────────────────────────── Filtros ───────────────────────────
 
 class _ChipFiltro extends StatelessWidget {
   final String etiqueta;
@@ -527,42 +556,30 @@ class _ChipFiltro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(Tokens.radioPildora),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            color: seleccionado ? tema.colorScheme.primary : Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: seleccionado
-                  ? tema.colorScheme.primary
-                  : tema.colorScheme.primary.withAlpha(30),
-              width: 1.5,
-            ),
-            boxShadow: seleccionado
-                ? [
-                    BoxShadow(
-                      color: tema.colorScheme.primary.withAlpha(60),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : [],
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(
+            horizontal: Tokens.e5,
+            vertical: Tokens.e2 + 2,
           ),
-          child: Center(
-            child: Text(
-              etiqueta,
-              style: GoogleFonts.outfit(
-                fontSize: 15,
-                fontWeight: seleccionado ? FontWeight.w700 : FontWeight.w600,
-                color: seleccionado ? Colors.white : tema.colorScheme.primary,
-              ),
+          decoration: BoxDecoration(
+            color: seleccionado ? Tokens.tinta : Tokens.superficie,
+            borderRadius: BorderRadius.circular(Tokens.radioPildora),
+            border: Border.all(
+              color: seleccionado ? Tokens.tinta : Tokens.linea,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            etiqueta,
+            style: tema.textTheme.labelMedium?.copyWith(
+              color: seleccionado ? Colors.white : Tokens.tintaMedia,
             ),
           ),
         ),
@@ -571,10 +588,12 @@ class _ChipFiltro extends StatelessWidget {
   }
 }
 
-class _TarjetaProductoIrresistible extends ConsumerWidget {
+// ─────────────────────────── Tarjeta de producto ───────────────────────────
+
+class _TarjetaProducto extends ConsumerWidget {
   final Map<String, dynamic> producto;
 
-  const _TarjetaProductoIrresistible({required this.producto});
+  const _TarjetaProducto({required this.producto});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -586,178 +605,481 @@ class _TarjetaProductoIrresistible extends ConsumerWidget {
     final precioD = double.tryParse(precio) ?? 0.0;
     final urlImagen = producto['url_imagen'];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: tema.colorScheme.primary.withAlpha(15),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
+    return TarjetaSuave(
+      padding: EdgeInsets.zero,
+      radio: Tokens.radioXl,
+      sombra: Tokens.sombraMedia,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Gran Foto del Postre
-          Hero(
-            tag: 'postre_${producto['id']}',
-            child: Container(
-              height: 250,
-              decoration: BoxDecoration(
-                color: tema.colorScheme.primaryContainer,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(32),
+          // Fotografía
+          Stack(
+            children: [
+              Hero(
+                tag: 'postre_${producto['id']}',
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(Tokens.radioXl - 1),
+                  ),
+                  child: SizedBox(
+                    height: 236,
+                    width: double.infinity,
+                    child: urlImagen != null
+                        ? Image.network(
+                            urlImagen,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, progreso) =>
+                                progreso == null
+                                ? child
+                                : const Esqueleto(alto: 236, radio: 0),
+                            errorBuilder: (_, _, _) => const _ImagenAusente(),
+                          )
+                        : const _ImagenAusente(),
+                  ),
                 ),
               ),
-              child: urlImagen != null
-                  ? ClipRRect(
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(32),
-                      ),
-                      child: Image.network(urlImagen, fit: BoxFit.cover),
-                    )
-                  : Icon(
-                      Icons.cake_rounded,
-                      size: 80,
-                      color: tema.colorScheme.primary.withAlpha(100),
+              // Precio sobre la foto
+              Positioned(
+                right: Tokens.e4,
+                bottom: Tokens.e4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Tokens.e4,
+                    vertical: Tokens.e2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(Tokens.radioPildora),
+                    boxShadow: Tokens.sombraSuave,
+                  ),
+                  child: Text(
+                    '\$$precio',
+                    style: tema.textTheme.titleLarge?.copyWith(
+                      color: Tokens.rosaProfundo,
                     ),
-            ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          // Información y Botón de Acción
           Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(Tokens.e5 + 2),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        nombre,
-                        style: GoogleFonts.outfit(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800,
-                          color: tema.textTheme.displayLarge?.color,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Text(
-                      '\$$precio',
-                      style: GoogleFonts.outfit(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: tema.colorScheme.primary,
-                      ),
-                    ),
-                  ],
+                Text(nombre, style: tema.textTheme.headlineSmall),
+                const SizedBox(height: Tokens.e2),
+                Text(
+                  descripcion,
+                  style: tema.textTheme.bodyMedium,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 8),
-                if (precioD >= 5.0) // Mostrar solo para productos de $5 o más
+
+                if (precioD >= 5.0) ...[
+                  const SizedBox(height: Tokens.e4),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Tokens.e3 + 2,
+                      vertical: Tokens.e3,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.amber.withAlpha(40),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.withAlpha(100)),
+                      color: Tokens.arenaSuave,
+                      borderRadius: BorderRadius.circular(Tokens.radioSm),
+                      border: Border.all(
+                        color: Tokens.arena.withValues(alpha: 0.28),
+                      ),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.workspace_premium_rounded,
+                          size: 17,
+                          color: Tokens.arenaProfundo,
+                        ),
+                        const SizedBox(width: Tokens.e2 + 2),
                         Expanded(
-                          child: Text(
-                            'Club M&G: Llévalo hoy y paga en 3 cuotas de \$${(precioD / 3).toStringAsFixed(2)}',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.amber.shade800,
+                          child: RichText(
+                            text: TextSpan(
+                              style: tema.textTheme.bodySmall?.copyWith(
+                                color: Tokens.arenaProfundo,
+                                height: 1.4,
+                              ),
+                              children: [
+                                const TextSpan(text: 'Club M&G · 3 cuotas de '),
+                                TextSpan(
+                                  text:
+                                      '\$${(precioD / 3).toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                if (precioD >= 5.0) const SizedBox(height: 8),
-                Text(
-                  descripcion,
-                  style: GoogleFonts.inter(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: tema.textTheme.bodyMedium?.color,
-                  ),
-                ),
-                const SizedBox(height: 24),
+                ],
 
-                // Botón "Pedir Ahora" muy vibrante
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      ref
-                          .read(proveedorCarrito.notifier)
-                          .agregarProducto(producto);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(
-                                Icons.check_circle,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text('¡$nombre añadido al carrito!'),
-                              ),
-                            ],
-                          ),
-                          backgroundColor: tema.colorScheme.secondary,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: tema.colorScheme.primary,
-                      foregroundColor: Colors.white,
-                      elevation: 8,
-                      shadowColor: tema.colorScheme.primary.withAlpha(150),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.shopping_bag_rounded, size: 22),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Pedir Ahora',
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                const SizedBox(height: Tokens.e5),
+
+                BotonPrincipal(
+                  texto: 'Añadir al pedido',
+                  icono: Icons.add_rounded,
+                  altura: 52,
+                  alPresionar: () {
+                    ref
+                        .read(proveedorCarrito.notifier)
+                        .agregarProducto(producto);
+                    Avisos.exito(context, '$nombre se añadió a tu pedido');
+                  },
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ImagenAusente extends StatelessWidget {
+  const _ImagenAusente();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: Tokens.rosaVelo,
+      alignment: Alignment.center,
+      child: const Icon(Icons.cake_rounded, size: 46, color: Tokens.rosaSuave),
+    );
+  }
+}
+
+class _EsqueletoCatalogo extends StatelessWidget {
+  const _EsqueletoCatalogo();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: List.generate(
+        2,
+        (_) => Padding(
+          padding: const EdgeInsets.only(bottom: Tokens.e6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Esqueleto(alto: 236, radio: Tokens.radioXl),
+              SizedBox(height: Tokens.e4),
+              Esqueleto(alto: 20, ancho: 180),
+              SizedBox(height: Tokens.e3),
+              Esqueleto(alto: 14),
+              SizedBox(height: Tokens.e2),
+              Esqueleto(alto: 14, ancho: 220),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────── Acciones flotantes ───────────────────────────
+
+class _BotonChat extends StatelessWidget {
+  final bool cargando;
+  final VoidCallback alPresionar;
+
+  const _BotonChat({required this.cargando, required this.alPresionar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Tokens.radioPildora),
+        boxShadow: Tokens.haloColor(Tokens.tinta),
+      ),
+      child: Material(
+        color: Tokens.tinta,
+        borderRadius: BorderRadius.circular(Tokens.radioPildora),
+        child: InkWell(
+          onTap: alPresionar,
+          borderRadius: BorderRadius.circular(Tokens.radioPildora),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Tokens.e5,
+              vertical: Tokens.e4,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (cargando)
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 18,
+                    color: Tokens.arena,
+                  ),
+                const SizedBox(width: Tokens.e2 + 2),
+                Text(
+                  'Asistente',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).animate().fadeIn(delay: 300.ms).scale(
+      curve: Curves.easeOutBack,
+      duration: 400.ms,
+      begin: const Offset(0.85, 0.85),
+    );
+  }
+}
+
+/// Barra inferior con el resumen del pedido; aparece sólo con artículos.
+class _BarraCarrito extends StatelessWidget {
+  final int cantidad;
+  final double total;
+  final VoidCallback alPresionar;
+
+  const _BarraCarrito({
+    required this.cantidad,
+    required this.total,
+    required this.alPresionar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (cantidad == 0) return const SizedBox.shrink();
+    final tema = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Tokens.superficie,
+        border: const Border(top: BorderSide(color: Tokens.linea)),
+        boxShadow: Tokens.sombraMedia,
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            Tokens.e5,
+            Tokens.e3,
+            Tokens.e5,
+            Tokens.e3,
+          ),
+          child: Row(
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    cantidad == 1 ? '1 artículo' : '$cantidad artículos',
+                    style: tema.textTheme.labelSmall,
+                  ),
+                  Text(
+                    '\$${total.toStringAsFixed(2)}',
+                    style: tema.textTheme.headlineSmall,
+                  ),
+                ],
+              ),
+              const SizedBox(width: Tokens.e5),
+              Expanded(
+                child: BotonPrincipal(
+                  texto: 'Ver mi pedido',
+                  icono: Icons.arrow_forward_rounded,
+                  altura: 50,
+                  alPresionar: alPresionar,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).animate().slideY(begin: 1, duration: 350.ms, curve: Curves.easeOutCubic);
+  }
+}
+
+// ─────────────────────────── Cajón lateral ───────────────────────────
+
+class _CajonNavegacion extends ConsumerWidget {
+  final String nombre;
+  final String correo;
+  final String? fotoUrl;
+  final String iniciales;
+
+  const _CajonNavegacion({
+    required this.nombre,
+    required this.correo,
+    required this.fotoUrl,
+    required this.iniciales,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tema = Theme.of(context);
+
+    return Drawer(
+      width: 312,
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(Tokens.e6),
+              decoration: const BoxDecoration(
+                gradient: Tokens.degradadoAmanecer,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _Retrato(fotoUrl: fotoUrl, iniciales: iniciales, radio: 30),
+                  const SizedBox(height: Tokens.e4),
+                  Text(
+                    nombre,
+                    style: tema.textTheme.headlineSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (correo.isNotEmpty)
+                    Text(
+                      correo,
+                      style: tema.textTheme.bodySmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: Tokens.e5),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Tokens.e5),
+              child: const Antetitulo('Mi cuenta'),
+            ),
+            const SizedBox(height: Tokens.e3),
+            _OpcionCajon(
+              icono: Icons.person_outline_rounded,
+              titulo: 'Mi perfil',
+              detalle: 'Datos, estadísticas y crédito',
+              color: Tokens.rosa,
+              alTocar: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PantallaPerfil()),
+                );
+              },
+            ),
+            _OpcionCajon(
+              icono: Icons.workspace_premium_outlined,
+              titulo: 'Club M&G',
+              detalle: 'Tus cuotas y beneficios',
+              color: Tokens.arenaProfundo,
+              alTocar: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const PantallaClubMg()),
+                );
+              },
+            ),
+            const Spacer(),
+            Padding(
+              padding: const EdgeInsets.all(Tokens.e5),
+              child: BotonContorno(
+                texto: 'Cerrar sesión',
+                icono: Icons.logout_rounded,
+                altura: 50,
+                color: Tokens.peligro,
+                alPresionar: () async {
+                  await ref.read(supabaseProveedor).auth.signOut();
+                  if (context.mounted) {
+                    Navigator.of(context).pushReplacementNamed('/');
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OpcionCajon extends StatelessWidget {
+  final IconData icono;
+  final String titulo;
+  final String detalle;
+  final Color color;
+  final VoidCallback alTocar;
+
+  const _OpcionCajon({
+    required this.icono,
+    required this.titulo,
+    required this.detalle,
+    required this.color,
+    required this.alTocar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Tokens.e4, 0, Tokens.e4, Tokens.e2),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(Tokens.radioSm),
+        child: InkWell(
+          onTap: alTocar,
+          borderRadius: BorderRadius.circular(Tokens.radioSm),
+          child: Padding(
+            padding: const EdgeInsets.all(Tokens.e3),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(Tokens.radioXs),
+                  ),
+                  child: Icon(icono, size: 18, color: color),
+                ),
+                const SizedBox(width: Tokens.e3 + 2),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(titulo, style: tema.textTheme.titleMedium),
+                      Text(detalle, style: tema.textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: Tokens.tintaSuave,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

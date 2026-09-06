@@ -1,19 +1,21 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../repositorios/repositorio_autenticacion.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../nucleo/constantes/tipos_negocio.dart';
+import '../../../nucleo/tema/tokens_app.dart';
+import '../../../repositorios/repositorio_autenticacion.dart';
+import '../../widgets/componentes.dart';
 
 class PantallaRegistroNegocio extends ConsumerStatefulWidget {
   const PantallaRegistroNegocio({super.key});
 
   @override
-  ConsumerState<PantallaRegistroNegocio> createState() => _PantallaRegistroNegocioState();
+  ConsumerState<PantallaRegistroNegocio> createState() =>
+      _PantallaRegistroNegocioState();
 }
 
-class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegocio> {
+class _PantallaRegistroNegocioState
+    extends ConsumerState<PantallaRegistroNegocio> {
   final _formKey = GlobalKey<FormState>();
   final _nombreNegocioCtrl = TextEditingController();
   final _correoCtrl = TextEditingController();
@@ -35,14 +37,7 @@ class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegoci
   Future<void> _registrar() async {
     if (!_formKey.currentState!.validate()) return;
     if (_tipoSeleccionado == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Por favor selecciona el tipo de negocio'),
-          backgroundColor: Colors.orange.shade700,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      Avisos.atencion(context, 'Selecciona el tipo de negocio.');
       return;
     }
 
@@ -62,21 +57,34 @@ class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegoci
           context: context,
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            icon: const Icon(Icons.check_circle_rounded, size: 56, color: Color(0xFF10B981)),
-            title: Text('¡Solicitud Enviada!', style: GoogleFonts.outfit(fontWeight: FontWeight.w600)),
+            icon: const Icon(
+              Icons.mark_email_read_outlined,
+              size: 34,
+              color: Tokens.exito,
+            ),
+            title: const Text('Solicitud enviada'),
             content: Text(
-              'Tu negocio "${_nombreNegocioCtrl.text.trim()}" está en proceso de revisión.\n\nTe notificaremos cuando sea aprobado para que puedas empezar a vender.',
+              'Tu negocio "${_nombreNegocioCtrl.text.trim()}" está en revisión. '
+              'Te avisaremos en cuanto sea aprobado para que puedas empezar '
+              'a vender.',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(height: 1.5),
+            ),
+            actionsPadding: const EdgeInsets.fromLTRB(
+              Tokens.e5,
+              0,
+              Tokens.e5,
+              Tokens.e5,
             ),
             actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  Navigator.pop(context);
-                },
-                child: const Text('Entendido'),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Entendido'),
+                ),
               ),
             ],
           ),
@@ -85,16 +93,7 @@ class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegoci
         await auth.cerrarSesion();
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
+      if (mounted) Avisos.error(context, 'Error: $e');
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
@@ -112,39 +111,53 @@ class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegoci
           minChildSize: 0.4,
           builder: (_, scrollController) {
             return Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: const BoxDecoration(
+                color: Tokens.superficie,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(Tokens.radioXl),
+                ),
               ),
               child: Column(
                 children: [
-                  // Handle bar
                   Container(
-                    margin: const EdgeInsets.only(top: 12),
-                    width: 40,
+                    margin: const EdgeInsets.only(top: Tokens.e3),
+                    width: 42,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade400,
+                      color: Tokens.lineaFuerte,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'Selecciona el tipo de negocio',
-                      style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600),
+                    padding: const EdgeInsets.fromLTRB(
+                      Tokens.e6,
+                      Tokens.e5,
+                      Tokens.e6,
+                      Tokens.e4,
+                    ),
+                    child: const EncabezadoSeccion(
+                      antetitulo: 'Categoría',
+                      titulo: 'Tipo de negocio',
+                      descripcion:
+                          'Elige la categoría que mejor describe tu tienda.',
                     ),
                   ),
                   Expanded(
                     child: GridView.builder(
                       controller: scrollController,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.85,
+                      padding: const EdgeInsets.fromLTRB(
+                        Tokens.e5,
+                        0,
+                        Tokens.e5,
+                        Tokens.e8,
                       ),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            mainAxisSpacing: Tokens.e3,
+                            crossAxisSpacing: Tokens.e3,
+                            childAspectRatio: 0.85,
+                          ),
                       itemCount: tiposNegocioDisponibles.length,
                       itemBuilder: (context, index) {
                         final tipo = tiposNegocioDisponibles[index];
@@ -158,35 +171,47 @@ class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegoci
                             duration: const Duration(milliseconds: 200),
                             decoration: BoxDecoration(
                               color: seleccionado
-                                  ? Theme.of(context).colorScheme.primaryContainer
-                                  : Theme.of(context).colorScheme.surfaceContainerHighest,
-                              borderRadius: BorderRadius.circular(16),
-                              border: seleccionado
-                                  ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-                                  : null,
+                                  ? Tokens.rosaVelo
+                                  : Tokens.superficieSuave,
+                              borderRadius: BorderRadius.circular(
+                                Tokens.radioSm,
+                              ),
+                              border: Border.all(
+                                color: seleccionado
+                                    ? Tokens.rosa
+                                    : Tokens.linea,
+                                width: seleccionado ? 1.5 : 1,
+                              ),
                             ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
                                   tipo.icono,
-                                  size: 32,
+                                  size: 26,
                                   color: seleccionado
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ? Tokens.rosaProfundo
+                                      : Tokens.tintaMedia,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  tipo.etiqueta,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    fontWeight: seleccionado ? FontWeight.w600 : FontWeight.w500,
-                                    color: seleccionado
-                                        ? Theme.of(context).colorScheme.primary
-                                        : Theme.of(context).colorScheme.onSurface,
+                                const SizedBox(height: Tokens.e2),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  child: Text(
+                                    tipo.etiqueta,
+                                    textAlign: TextAlign.center,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelMedium
+                                        ?.copyWith(
+                                          fontSize: 11.5,
+                                          color: seleccionado
+                                              ? Tokens.rosaProfundo
+                                              : Tokens.tintaMedia,
+                                        ),
                                   ),
                                 ),
                               ],
@@ -208,294 +233,261 @@ class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegoci
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-    final infoTipo = _tipoSeleccionado != null ? obtenerInfoTipo(_tipoSeleccionado!) : null;
+    final infoTipo = _tipoSeleccionado != null
+        ? obtenerInfoTipo(_tipoSeleccionado!)
+        : null;
 
     return Scaffold(
-      backgroundColor: tema.scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          // Fondo oscuro premium con destellos (mesh gradient simulado)
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: tema.colorScheme.primaryContainer.withAlpha(51),
-                boxShadow: [
-                  BoxShadow(
-                    color: tema.colorScheme.primaryContainer.withAlpha(51),
-                    blurRadius: 100,
-                    spreadRadius: 50,
-                  ),
-                ],
-              ),
-            ),
-          ).animate(onPlay: (controller) => controller.repeat()).move(
-                duration: 10.seconds,
-                begin: const Offset(0, 0),
-                end: const Offset(-50, 50),
-                curve: Curves.easeInOutSine,
-              ),
-          Positioned(
-            bottom: -50,
-            left: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: tema.colorScheme.secondary.withAlpha(38),
-                boxShadow: [
-                  BoxShadow(
-                    color: tema.colorScheme.secondary.withAlpha(38),
-                    blurRadius: 100,
-                    spreadRadius: 50,
-                  ),
-                ],
-              ),
-            ),
-          ).animate(onPlay: (controller) => controller.repeat(reverse: true)).move(
-                duration: 8.seconds,
-                begin: const Offset(0, 0),
-                end: const Offset(30, -30),
-                curve: Curves.easeInOutSine,
-              ),
-          SafeArea(
+      body: FondoAtelier(
+        child: SafeArea(
           child: Column(
             children: [
-              // AppBar manual
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.e5,
+                  Tokens.e3,
+                  Tokens.e5,
+                  0,
+                ),
                 child: Row(
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
+                    BotonCircular(
+                      icono: Icons.arrow_back_rounded,
+                      tooltip: 'Volver',
+                      alPresionar: () => Navigator.maybePop(context),
                     ),
                     const Spacer(),
-                    Text(
-                      'Registro de Negocio',
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
+                    const Antetitulo('Alta de comercio'),
                     const Spacer(),
-                    const SizedBox(width: 48), // Balance visual
+                    const SizedBox(width: 42),
                   ],
                 ),
               ),
-              // Formulario
               Expanded(
-                child: Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                        child: Container(
-                          padding: const EdgeInsets.all(28),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(15),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: Colors.white.withAlpha(25), width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(30),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              )
-                            ],
-                          ),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                // Ícono central
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(24),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withAlpha(10),
-                                        borderRadius: BorderRadius.circular(24),
-                                        border: Border.all(color: Colors.white.withAlpha(25), width: 1.5),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12.0),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    Tokens.e6,
+                    Tokens.e6,
+                    Tokens.e6,
+                    Tokens.e12,
+                  ),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 460),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Center(
+                              child:
+                                  Container(
+                                        padding: const EdgeInsets.all(
+                                          Tokens.e5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Tokens.superficie,
+                                          borderRadius: BorderRadius.circular(
+                                            Tokens.radioLg,
+                                          ),
+                                          border: Border.all(
+                                            color: Tokens.linea,
+                                          ),
+                                          boxShadow: Tokens.sombraSuave,
+                                        ),
                                         child: Image.asset(
                                           'assets/imagenes/compra_ya_logo.png',
-                                          height: 60,
+                                          height: 56,
                                         ),
-                                      ),
-                                    ),
-                                  ),
-                                ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack).fadeIn(),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Crea tu tienda digital',
-                                  textAlign: TextAlign.center,
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 24),
-
-                                // Selector de tipo de negocio
-                                GestureDetector(
-                                  onTap: _cargando ? null : _mostrarSelectorTipo,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha(13),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: _tipoSeleccionado != null
-                                            ? Colors.white
-                                            : Colors.white.withAlpha(77),
-                                        width: _tipoSeleccionado != null ? 2 : 1,
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          infoTipo?.icono ?? Icons.category_outlined,
-                                          color: Colors.white.withAlpha(179),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Text(
-                                            infoTipo?.etiqueta ?? 'Tipo de negocio *',
-                                            style: TextStyle(
-                                              color: infoTipo != null
-                                                  ? Colors.white
-                                                  : Colors.white.withAlpha(179),
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ),
-                                        Icon(
-                                          Icons.arrow_drop_down,
-                                          color: Colors.white.withAlpha(179),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ).animate().slideY(begin: 0.2, duration: 600.ms, delay: 200.ms).fadeIn(),
-                                const SizedBox(height: 16),
-
-                                _construirCampo(
-                                  controlador: _nombreNegocioCtrl,
-                                  etiqueta: 'Nombre del negocio',
-                                  icono: Icons.business_rounded,
-                                  validador: (v) => (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
-                                ).animate().slideY(begin: 0.2, duration: 600.ms, delay: 300.ms).fadeIn(),
-                                const SizedBox(height: 16),
-                                _construirCampo(
-                                  controlador: _correoCtrl,
-                                  etiqueta: 'Correo electrónico',
-                                  icono: Icons.email_outlined,
-                                  tipoTeclado: TextInputType.emailAddress,
-                                  validador: (v) {
-                                    if (v == null || v.trim().isEmpty) return 'Campo requerido';
-                                    if (!v.contains('@')) return 'Correo inválido';
-                                    return null;
-                                  },
-                                ).animate().slideY(begin: 0.2, duration: 600.ms, delay: 400.ms).fadeIn(),
-                                const SizedBox(height: 16),
-                                _construirCampo(
-                                  controlador: _telefonoCtrl,
-                                  etiqueta: 'Teléfono de contacto',
-                                  icono: Icons.phone_outlined,
-                                  tipoTeclado: TextInputType.phone,
-                                  validador: (v) => (v == null || v.trim().isEmpty) ? 'Campo requerido' : null,
-                                ).animate().slideY(begin: 0.2, duration: 600.ms, delay: 500.ms).fadeIn(),
-                                const SizedBox(height: 16),
-                                TextFormField(
-                                  controller: _contrasenaCtrl,
-                                  obscureText: !_mostrarContrasena,
-                                  style: const TextStyle(color: Colors.white),
-                                  decoration: InputDecoration(
-                                    labelText: 'Contraseña',
-                                    labelStyle: TextStyle(color: Colors.white.withAlpha(179)),
-                                    prefixIcon: Icon(Icons.lock_outline, color: Colors.white.withAlpha(179)),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _mostrarContrasena ? Icons.visibility_off : Icons.visibility,
-                                        color: Colors.white.withAlpha(179),
-                                      ),
-                                      onPressed: () => setState(() => _mostrarContrasena = !_mostrarContrasena),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(color: Colors.white.withAlpha(77)),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(color: Colors.white, width: 2),
-                                    ),
-                                    errorBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(color: Colors.red.shade300),
-                                    ),
-                                    focusedErrorBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide(color: Colors.red.shade300, width: 2),
-                                    ),
-                                    filled: true,
-                                    fillColor: Colors.white.withAlpha(13),
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Campo requerido';
-                                    if (v.length < 6) return 'Mínimo 6 caracteres';
-                                    return null;
-                                  },
-                                ).animate().slideY(begin: 0.2, duration: 600.ms, delay: 600.ms).fadeIn(),
-                                const SizedBox(height: 28),
-                                SizedBox(
-                                  height: 52,
-                                  child: ElevatedButton(
-                                    onPressed: _cargando ? null : _registrar,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.white,
-                                      foregroundColor: tema.colorScheme.primary,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    child: _cargando
-                                        ? SizedBox(
-                                            height: 22,
-                                            width: 22,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2.5,
-                                              color: tema.colorScheme.primary,
-                                            ),
-                                          )
-                                        : Text(
-                                            'Enviar Solicitud',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
-                                  ),
-                                ).animate().slideY(begin: 0.2, duration: 600.ms, delay: 700.ms).fadeIn(),
-                              ],
+                                      )
+                                      .animate()
+                                      .scale(
+                                        duration: 600.ms,
+                                        curve: Curves.easeOutBack,
+                                        begin: const Offset(0.8, 0.8),
+                                      )
+                                      .fadeIn(),
                             ),
-                          ),
-                        ),
+                            const SizedBox(height: Tokens.e6),
+                            Text(
+                              'Crea tu tienda digital',
+                              textAlign: TextAlign.center,
+                              style: tema.textTheme.displaySmall,
+                            ),
+                            const SizedBox(height: Tokens.e3),
+                            Text(
+                              'Registra tu negocio y empieza a vender con un '
+                              'asistente que atiende a tus clientes.',
+                              textAlign: TextAlign.center,
+                              style: tema.textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: Tokens.e8),
+
+                            TarjetaSuave(
+                              padding: const EdgeInsets.all(Tokens.e6),
+                              sombra: Tokens.sombraMedia,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Selector de tipo
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 2,
+                                      bottom: Tokens.e2,
+                                    ),
+                                    child: Text(
+                                      'Tipo de negocio',
+                                      style: tema.textTheme.labelMedium
+                                          ?.copyWith(color: Tokens.tintaMedia),
+                                    ),
+                                  ),
+                                  InkWell(
+                                    onTap: _cargando ? null : _mostrarSelectorTipo,
+                                    borderRadius: BorderRadius.circular(
+                                      Tokens.radioSm,
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: Tokens.e5,
+                                        vertical: Tokens.e4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Tokens.superficie,
+                                        borderRadius: BorderRadius.circular(
+                                          Tokens.radioSm,
+                                        ),
+                                        border: Border.all(
+                                          color: infoTipo != null
+                                              ? Tokens.rosa
+                                              : Tokens.linea,
+                                          width: infoTipo != null ? 1.6 : 1,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            infoTipo?.icono ??
+                                                Icons.storefront_outlined,
+                                            size: 19,
+                                            color: infoTipo != null
+                                                ? Tokens.rosaProfundo
+                                                : Tokens.tintaSuave,
+                                          ),
+                                          const SizedBox(width: Tokens.e3 + 2),
+                                          Expanded(
+                                            child: Text(
+                                              infoTipo?.etiqueta ??
+                                                  'Selecciona una categoría',
+                                              style: tema.textTheme.titleMedium
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w500,
+                                                    color: infoTipo != null
+                                                        ? Tokens.tinta
+                                                        : Tokens.tintaSuave,
+                                                  ),
+                                            ),
+                                          ),
+                                          const Icon(
+                                            Icons.expand_more_rounded,
+                                            size: 20,
+                                            color: Tokens.tintaSuave,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: Tokens.e5),
+
+                                  CampoTexto(
+                                    controlador: _nombreNegocioCtrl,
+                                    etiqueta: 'Nombre del negocio',
+                                    pista: 'Cómo te conocen tus clientes',
+                                    icono: Icons.storefront_outlined,
+                                    validador: (v) =>
+                                        (v == null || v.trim().isEmpty)
+                                        ? 'Campo requerido'
+                                        : null,
+                                  ),
+                                  const SizedBox(height: Tokens.e5),
+                                  CampoTexto(
+                                    controlador: _correoCtrl,
+                                    etiqueta: 'Correo electrónico',
+                                    pista: 'contacto@tunegocio.com',
+                                    icono: Icons.alternate_email_rounded,
+                                    teclado: TextInputType.emailAddress,
+                                    validador: (v) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Campo requerido';
+                                      }
+                                      if (!v.contains('@')) {
+                                        return 'Correo inválido';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: Tokens.e5),
+                                  CampoTexto(
+                                    controlador: _telefonoCtrl,
+                                    etiqueta: 'Teléfono de contacto',
+                                    pista: 'Con código de país',
+                                    icono: Icons.phone_iphone_rounded,
+                                    teclado: TextInputType.phone,
+                                    validador: (v) =>
+                                        (v == null || v.trim().isEmpty)
+                                        ? 'Campo requerido'
+                                        : null,
+                                  ),
+                                  const SizedBox(height: Tokens.e5),
+                                  CampoTexto(
+                                    controlador: _contrasenaCtrl,
+                                    etiqueta: 'Contraseña',
+                                    pista: 'Mínimo 6 caracteres',
+                                    icono: Icons.lock_outline_rounded,
+                                    esClave: !_mostrarContrasena,
+                                    sufijo: IconButton(
+                                      icon: Icon(
+                                        _mostrarContrasena
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                        size: 19,
+                                      ),
+                                      onPressed: () => setState(
+                                        () => _mostrarContrasena =
+                                            !_mostrarContrasena,
+                                      ),
+                                    ),
+                                    validador: (v) {
+                                      if (v == null || v.isEmpty) {
+                                        return 'Campo requerido';
+                                      }
+                                      if (v.length < 6) {
+                                        return 'Mínimo 6 caracteres';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            const SizedBox(height: Tokens.e6),
+
+                            BotonPrincipal(
+                              texto: 'Enviar solicitud',
+                              icono: Icons.send_rounded,
+                              cargando: _cargando,
+                              alPresionar: _registrar,
+                            ),
+                            const SizedBox(height: Tokens.e4),
+                            Text(
+                              'Revisamos cada solicitud manualmente. '
+                              'Suele tomar menos de 24 horas.',
+                              textAlign: TextAlign.center,
+                              style: tema.textTheme.bodySmall,
+                            ),
+                          ],
+                        ).animate().fadeIn(duration: 400.ms),
                       ),
                     ),
                   ),
@@ -504,46 +496,7 @@ class _PantallaRegistroNegocioState extends ConsumerState<PantallaRegistroNegoci
             ],
           ),
         ),
-        ],
       ),
-    );
-  }
-
-  Widget _construirCampo({
-    required TextEditingController controlador,
-    required String etiqueta,
-    required IconData icono,
-    TextInputType tipoTeclado = TextInputType.text,
-    String? Function(String?)? validador,
-  }) {
-    return TextFormField(
-      controller: controlador,
-      keyboardType: tipoTeclado,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: etiqueta,
-        labelStyle: TextStyle(color: Colors.white.withAlpha(179)),
-        prefixIcon: Icon(icono, color: Colors.white.withAlpha(179)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.white.withAlpha(77)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Colors.white, width: 2),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.red.shade300),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.red.shade300, width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.white.withAlpha(13),
-      ),
-      validator: validador,
     );
   }
 }

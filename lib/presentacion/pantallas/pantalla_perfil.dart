@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../nucleo/tema/tokens_app.dart';
+import '../../proveedores/supabase_proveedor.dart';
 import '../../repositorios/repositorio_credito.dart';
 import '../../repositorios/repositorio_ordenes.dart';
-import '../../proveedores/supabase_proveedor.dart';
+import '../widgets/componentes.dart';
+import 'pantalla_club_mg.dart';
 
 class PantallaPerfil extends ConsumerStatefulWidget {
   const PantallaPerfil({super.key});
@@ -19,7 +21,7 @@ class _PantallaPerfilState extends ConsumerState<PantallaPerfil> {
   String _correo = '';
   String? _fotoPerfilUrl;
   bool _cargandoDatos = true;
-  
+
   int _totalPedidos = 0;
   double _totalGastado = 0.0;
   List<Map<String, dynamic>> _nivelesCredito = [];
@@ -34,7 +36,7 @@ class _PantallaPerfilState extends ConsumerState<PantallaPerfil> {
     final supabase = ref.read(supabaseProveedor);
     final repoCredito = ref.read(proveedorRepositorioCredito);
     final repoOrdenes = ref.read(proveedorRepositorioOrdenes);
-    
+
     final usuario = supabase.auth.currentUser;
     if (usuario != null) {
       _correo = usuario.email ?? '';
@@ -48,21 +50,24 @@ class _PantallaPerfilState extends ConsumerState<PantallaPerfil> {
             .maybeSingle();
 
         if (clienteRes != null) {
-          if (clienteRes['nombre'] != null && clienteRes['nombre'].toString().isNotEmpty) {
+          if (clienteRes['nombre'] != null &&
+              clienteRes['nombre'].toString().isNotEmpty) {
             _nombreUsuario = clienteRes['nombre'];
           }
-          if (clienteRes['foto_url'] != null && clienteRes['foto_url'].toString().isNotEmpty) {
+          if (clienteRes['foto_url'] != null &&
+              clienteRes['foto_url'].toString().isNotEmpty) {
             _fotoPerfilUrl = clienteRes['foto_url'];
           }
-          if (clienteRes['correo'] != null && clienteRes['correo'].toString().isNotEmpty) {
+          if (clienteRes['correo'] != null &&
+              clienteRes['correo'].toString().isNotEmpty) {
             _correo = clienteRes['correo'];
           }
         }
-        
+
         final vencidas = await repoCredito.tieneCuotasVencidas();
         final stats = await repoOrdenes.obtenerEstadisticasUsuario();
         final niveles = await repoCredito.obtenerNivelesCredito();
-        
+
         if (mounted) {
           setState(() {
             _tieneCuotasVencidas = vencidas;
@@ -83,8 +88,8 @@ class _PantallaPerfilState extends ConsumerState<PantallaPerfil> {
 
   String _obtenerIniciales() {
     if (_nombreUsuario.isEmpty || _nombreUsuario == 'Invitado') return 'I';
-    final partes = _nombreUsuario.split(' ');
-    if (partes.length > 1) {
+    final partes = _nombreUsuario.trim().split(' ');
+    if (partes.length > 1 && partes[1].isNotEmpty) {
       return '${partes[0][0]}${partes[1][0]}'.toUpperCase();
     }
     return _nombreUsuario.substring(0, 1).toUpperCase();
@@ -96,371 +101,412 @@ class _PantallaPerfilState extends ConsumerState<PantallaPerfil> {
     final repoCredito = ref.watch(proveedorRepositorioCredito);
 
     return Scaffold(
-      backgroundColor: tema.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(
-          'Mi Perfil',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: _cargandoDatos
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                children: [
-                  const SizedBox(height: 16),
-                  
-                  // Avatar y Nombre
-                  Center(
-                    child: Column(
-                      children: [
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundColor: tema.colorScheme.primary.withAlpha(40),
-                          backgroundImage: _fotoPerfilUrl != null ? NetworkImage(_fotoPerfilUrl!) : null,
-                          child: _fotoPerfilUrl == null
-                              ? Text(
-                                  _obtenerIniciales(),
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 36,
-                                    fontWeight: FontWeight.bold,
-                                    color: tema.colorScheme.primary,
-                                  ),
-                                )
-                              : null,
-                        ).animate().scale(duration: 400.ms, curve: Curves.easeOutBack),
-                        const SizedBox(height: 16),
-                        Text(
-                          _nombreUsuario,
-                          style: GoogleFonts.outfit(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _correo,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: tema.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+      body: FondoAtelier(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.e5,
+                  Tokens.e3,
+                  Tokens.e5,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    BotonCircular(
+                      icono: Icons.arrow_back_rounded,
+                      tooltip: 'Volver',
+                      alPresionar: () => Navigator.maybePop(context),
                     ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Indicador de Estatus
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                    decoration: BoxDecoration(
-                      color: _tieneCuotasVencidas 
-                          ? Colors.red.withAlpha(20) 
-                          : Colors.green.withAlpha(20),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _tieneCuotasVencidas ? Colors.red.withAlpha(100) : Colors.green.withAlpha(100),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: _tieneCuotasVencidas ? Colors.red : Colors.green,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            _tieneCuotasVencidas ? Icons.warning_rounded : Icons.check_circle_outline,
-                            color: Colors.white,
-                            size: 24,
-                          ),
+                    const Spacer(),
+                    const Antetitulo('Mi cuenta'),
+                    const Spacer(),
+                    const SizedBox(width: 42),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _cargandoDatos
+                    ? const Cargando(mensaje: 'Cargando tu perfil…')
+                    : ListView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(
+                          Tokens.e5,
+                          Tokens.e6,
+                          Tokens.e5,
+                          Tokens.e12,
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Identidad ──────────────────────────
+                          Column(
                             children: [
-                              Text(
-                                'Estado de tu cuenta',
-                                style: GoogleFonts.inter(fontSize: 12, color: tema.colorScheme.onSurfaceVariant),
-                              ),
-                              Text(
-                                _tieneCuotasVencidas 
-                                    ? 'Suspendida por cuotas pendientes' 
-                                    : 'Lista para compras financiadas',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: _tieneCuotasVencidas ? Colors.red[700] : Colors.green[700],
+                              Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Tokens.linea,
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: Tokens.sombraSuave,
                                 ),
+                                padding: const EdgeInsets.all(4),
+                                child: CircleAvatar(
+                                  radius: 46,
+                                  backgroundColor: Tokens.rosaVelo,
+                                  backgroundImage: _fotoPerfilUrl != null
+                                      ? NetworkImage(_fotoPerfilUrl!)
+                                      : null,
+                                  child: _fotoPerfilUrl == null
+                                      ? Text(
+                                          _obtenerIniciales(),
+                                          style: tema.textTheme.displaySmall
+                                              ?.copyWith(
+                                                color: Tokens.rosaProfundo,
+                                              ),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              const SizedBox(height: Tokens.e4),
+                              Text(
+                                _nombreUsuario,
+                                textAlign: TextAlign.center,
+                                style: tema.textTheme.headlineMedium,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(_correo, style: tema.textTheme.bodySmall),
+                            ],
+                          ).animate().fadeIn(duration: 450.ms).slideY(
+                            begin: 0.1,
+                            curve: Curves.easeOutCubic,
+                          ),
+
+                          const SizedBox(height: Tokens.e6),
+
+                          // ── Estado de la cuenta ────────────────
+                          Aviso(
+                            titulo: _tieneCuotasVencidas
+                                ? 'Cuenta suspendida'
+                                : 'Cuenta al día',
+                            detalle: _tieneCuotasVencidas
+                                ? 'Tienes cuotas vencidas. Regularízalas para '
+                                      'volver a financiar pedidos.'
+                                : 'Puedes financiar tus pedidos con el Club M&G.',
+                            icono: _tieneCuotasVencidas
+                                ? Icons.error_outline_rounded
+                                : Icons.verified_rounded,
+                            color: _tieneCuotasVencidas
+                                ? Tokens.peligro
+                                : Tokens.exito,
+                            fondo: _tieneCuotasVencidas
+                                ? Tokens.peligroSuave
+                                : Tokens.exitoSuave,
+                          ).animate().fadeIn(delay: 120.ms).slideY(begin: 0.08),
+
+                          const SizedBox(height: Tokens.e8),
+
+                          // ── Historial de compras ───────────────
+                          const EncabezadoSeccion(
+                            antetitulo: 'Historial',
+                            titulo: 'Tus compras',
+                          ),
+                          const SizedBox(height: Tokens.e4),
+                          Row(
+                            children: [
+                              _Metrica(
+                                etiqueta: 'Pedidos',
+                                valor: _totalPedidos.toString(),
+                                icono: Icons.receipt_long_outlined,
+                                color: Tokens.rosa,
+                              ),
+                              const SizedBox(width: Tokens.e3),
+                              _Metrica(
+                                etiqueta: 'Invertido',
+                                valor: '\$${_totalGastado.toStringAsFixed(2)}',
+                                icono: Icons.savings_outlined,
+                                color: Tokens.salviaProfundo,
                               ),
                             ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
+                          ).animate().fadeIn(delay: 220.ms).slideY(begin: 0.08),
 
-                  const SizedBox(height: 32),
+                          const SizedBox(height: Tokens.e8),
 
-                  // Estadísticas Generales
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'Estadísticas de Compras',
-                          style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            _TarjetaEstadistica(
-                              titulo: 'Pedidos Realizados',
-                              valor: _totalPedidos.toString(),
-                              icono: Icons.shopping_bag_outlined,
-                              colorIcono: tema.colorScheme.primary,
-                            ),
-                            const SizedBox(width: 16),
-                            _TarjetaEstadistica(
-                              titulo: 'Total Invertido',
-                              valor: '\$${_totalGastado.toStringAsFixed(2)}',
-                              icono: Icons.payments_outlined,
-                              colorIcono: Colors.green,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
+                          // ── Resumen financiero ─────────────────
+                          StreamBuilder<Map<String, dynamic>?>(
+                            stream: repoCredito.escucharLineaCredito(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: Tokens.e8,
+                                  ),
+                                  child: Cargando(),
+                                );
+                              }
 
-                  const SizedBox(height: 32),
-                  
-                  // StreamBuilder para las estadísticas en vivo
-                  StreamBuilder<Map<String, dynamic>?>(
-                    stream: repoCredito.escucharLineaCredito(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
+                              final linea = snapshot.data;
+                              final bool noTieneLinea = linea == null;
+                              final disponibleReal = noTieneLinea
+                                  ? 5.0
+                                  : double.parse(
+                                      linea['saldo_disponible'].toString(),
+                                    );
+                              final limite = noTieneLinea
+                                  ? 5.0
+                                  : double.parse(
+                                      linea['limite_total'].toString(),
+                                    );
+                              final puntos = noTieneLinea
+                                  ? 0
+                                  : (linea['puntos'] ?? 0);
+                              final nivel = noTieneLinea
+                                  ? 1
+                                  : (linea['nivel_actual'] ?? 1);
 
-                      final linea = snapshot.data;
-                      final bool noTieneLinea = linea == null;
-                      final disponibleReal = noTieneLinea ? 5.0 : double.parse(linea['saldo_disponible'].toString());
-                      final limite = noTieneLinea ? 5.0 : double.parse(linea['limite_total'].toString());
-                      final puntos = noTieneLinea ? 0 : (linea['puntos'] ?? 0);
-                      final nivel = noTieneLinea ? 1 : (linea['nivel_actual'] ?? 1);
-                      
-                      final disponibleUI = disponibleReal < 0 ? 0.0 : disponibleReal;
-                      final deudaTotal = limite - disponibleReal;
+                              final disponibleUI = disponibleReal < 0
+                                  ? 0.0
+                                  : disponibleReal;
+                              final deudaTotal = limite - disponibleReal;
 
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Text(
-                              'Resumen Financiero',
-                              style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // Tarjetas de Estadísticas
-                            Row(
-                              children: [
-                                _TarjetaEstadistica(
-                                  titulo: noTieneLinea ? 'Nivel Inicial' : 'Nivel Actual',
-                                  valor: nivel.toString(),
-                                  icono: Icons.star_rounded,
-                                  colorIcono: Colors.amber,
-                                ),
-                                const SizedBox(width: 16),
-                                _TarjetaEstadistica(
-                                  titulo: 'Puntos M&G',
-                                  valor: puntos.toString(),
-                                  icono: Icons.local_activity_rounded,
-                                  colorIcono: tema.colorScheme.primary,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            
-                            // Progreso de Nivel (Estilo Cashea)
-                            if (_nivelesCredito.isNotEmpty)
-                              Builder(
-                                builder: (context) {
-                                  int puntosSiguienteNivel = 0;
-                                  String nombreSiguienteNivel = 'Máximo Nivel';
-                                  double progresoNivel = 1.0;
-                                  int puntosNivelActual = 0;
-                                  
-                                  for (var n in _nivelesCredito) {
-                                    if (n['nivel'] == nivel) {
-                                      puntosNivelActual = n['puntos_requeridos'];
-                                    }
-                                    if (n['nivel'] == nivel + 1) {
-                                      puntosSiguienteNivel = n['puntos_requeridos'];
-                                      nombreSiguienteNivel = n['nombre'];
-                                    }
-                                  }
-                                  
-                                  if (puntosSiguienteNivel > 0) {
-                                    int puntosRango = puntosSiguienteNivel - puntosNivelActual;
-                                    int puntosGanadosEnNivel = puntos - puntosNivelActual;
-                                    progresoNivel = (puntosGanadosEnNivel / puntosRango).clamp(0.0, 1.0);
-                                  }
-                                  
-                                  return Container(
-                                    padding: const EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      color: tema.colorScheme.primary.withAlpha(20),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: tema.colorScheme.primary.withAlpha(50)),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                          children: [
-                                            Text(
-                                              puntosSiguienteNivel > 0 
-                                                  ? 'Progreso a Nivel $nombreSiguienteNivel'
-                                                  : '¡Has alcanzado el máximo nivel!',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 12, 
-                                                fontWeight: FontWeight.bold,
-                                                color: tema.colorScheme.primary,
-                                              ),
-                                            ),
-                                            if (puntosSiguienteNivel > 0)
-                                              Text(
-                                                '$puntos / $puntosSiguienteNivel pts',
-                                                style: GoogleFonts.outfit(
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                          ],
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  EncabezadoSeccion(
+                                    antetitulo: 'Club M&G',
+                                    titulo: 'Resumen financiero',
+                                    accion: TextButton(
+                                      onPressed: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const PantallaClubMg(),
                                         ),
-                                        if (puntosSiguienteNivel > 0) ...[
-                                          const SizedBox(height: 12),
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(10),
-                                            child: LinearProgressIndicator(
-                                              value: progresoNivel,
-                                              minHeight: 8,
-                                              backgroundColor: tema.colorScheme.primary.withAlpha(40),
-                                              valueColor: AlwaysStoppedAnimation<Color>(tema.colorScheme.primary),
-                                            ),
+                                      ),
+                                      child: const Text('Ver cuotas'),
+                                    ),
+                                  ),
+                                  const SizedBox(height: Tokens.e4),
+
+                                  Row(
+                                    children: [
+                                      _Metrica(
+                                        etiqueta: noTieneLinea
+                                            ? 'Nivel inicial'
+                                            : 'Nivel actual',
+                                        valor: nivel.toString(),
+                                        icono: Icons.workspace_premium_outlined,
+                                        color: Tokens.arenaProfundo,
+                                      ),
+                                      const SizedBox(width: Tokens.e3),
+                                      _Metrica(
+                                        etiqueta: 'Puntos M&G',
+                                        valor: puntos.toString(),
+                                        icono: Icons.auto_awesome_outlined,
+                                        color: Tokens.lavanda,
+                                      ),
+                                    ],
+                                  ),
+
+                                  if (_nivelesCredito.isNotEmpty) ...[
+                                    const SizedBox(height: Tokens.e3),
+                                    _ProgresoNivel(
+                                      niveles: _nivelesCredito,
+                                      nivel: nivel,
+                                      puntos: puntos,
+                                    ),
+                                  ],
+
+                                  const SizedBox(height: Tokens.e3),
+
+                                  TarjetaSuave(
+                                    padding: const EdgeInsets.all(Tokens.e5),
+                                    child: Column(
+                                      children: [
+                                        _FilaSaldo(
+                                          'Línea de compra',
+                                          limite,
+                                          Tokens.tintaMedia,
+                                        ),
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: Tokens.e4,
                                           ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Paga a tiempo y obtén +20 pts para más límite',
-                                            style: GoogleFonts.inter(
-                                              fontSize: 11,
-                                              color: tema.colorScheme.onSurfaceVariant,
-                                            ),
+                                          child: Divider(height: 1),
+                                        ),
+                                        _FilaSaldo(
+                                          'Deuda total',
+                                          deudaTotal,
+                                          Tokens.peligro,
+                                        ),
+                                        const Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: Tokens.e4,
                                           ),
-                                        ]
+                                          child: Divider(height: 1),
+                                        ),
+                                        _FilaSaldo(
+                                          'Disponible',
+                                          disponibleUI,
+                                          Tokens.exito,
+                                          esGrande: true,
+                                        ),
                                       ],
                                     ),
-                                  ).animate().fadeIn(delay: 450.ms).slideY(begin: 0.1);
-                                }
-                              ),
-                            const SizedBox(height: 16),
-                            
-                            // Detalle de saldos
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: tema.colorScheme.surface,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: tema.colorScheme.outlineVariant.withAlpha(50)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(5),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 5),
                                   ),
                                 ],
-                              ),
-                              child: Column(
-                                children: [
-                                  _FilaSaldo('Línea de Compra', limite, Colors.grey[700]!),
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 12),
-                                    child: Divider(height: 1),
-                                  ),
-                                  _FilaSaldo('Deuda Total', deudaTotal, Colors.red[600]!),
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(vertical: 12),
-                                    child: Divider(height: 1),
-                                  ),
-                                  _FilaSaldo('Disponible', disponibleUI, Colors.green[600]!, esGrande: true),
-                                ],
-                              ),
-                            )
-                          ],
-                        ),
-                      ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1);
-                    },
-                  ),
-                  
-                  const SizedBox(height: 40),
-                ],
+                              ).animate().fadeIn(delay: 280.ms).slideY(
+                                begin: 0.06,
+                              );
+                            },
+                          ),
+                        ],
+                      ),
               ),
-            ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _TarjetaEstadistica extends StatelessWidget {
-  final String titulo;
+// ─────────────────────────── Piezas ───────────────────────────
+
+/// Tarjeta de métrica: ícono, etiqueta y valor destacado.
+class _Metrica extends StatelessWidget {
+  final String etiqueta;
   final String valor;
   final IconData icono;
-  final Color colorIcono;
+  final Color color;
 
-  const _TarjetaEstadistica({
-    required this.titulo,
+  const _Metrica({
+    required this.etiqueta,
     required this.valor,
     required this.icono,
-    required this.colorIcono,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: tema.colorScheme.surface,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: tema.colorScheme.outlineVariant.withAlpha(50)),
-        ),
+      child: TarjetaSuave(
+        padding: const EdgeInsets.all(Tokens.e4 + 2),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icono, color: colorIcono, size: 28),
-            const SizedBox(height: 12),
-            Text(
-              titulo,
-              style: GoogleFonts.inter(fontSize: 12, color: tema.colorScheme.onSurfaceVariant),
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(Tokens.radioXs),
+              ),
+              child: Icon(icono, size: 17, color: color),
             ),
-            const SizedBox(height: 4),
-            Text(
-              valor,
-              style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
+            const SizedBox(height: Tokens.e4),
+            Text(etiqueta.toUpperCase(), style: tema.textTheme.labelSmall),
+            const SizedBox(height: 2),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(valor, style: tema.textTheme.headlineMedium),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Barra de avance hacia el siguiente nivel del Club.
+class _ProgresoNivel extends StatelessWidget {
+  final List<Map<String, dynamic>> niveles;
+  final int nivel;
+  final int puntos;
+
+  const _ProgresoNivel({
+    required this.niveles,
+    required this.nivel,
+    required this.puntos,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+
+    int puntosSiguienteNivel = 0;
+    String nombreSiguienteNivel = 'Máximo Nivel';
+    double progresoNivel = 1.0;
+    int puntosNivelActual = 0;
+
+    for (var n in niveles) {
+      if (n['nivel'] == nivel) {
+        puntosNivelActual = n['puntos_requeridos'];
+      }
+      if (n['nivel'] == nivel + 1) {
+        puntosSiguienteNivel = n['puntos_requeridos'];
+        nombreSiguienteNivel = n['nombre'];
+      }
+    }
+
+    if (puntosSiguienteNivel > 0) {
+      final puntosRango = puntosSiguienteNivel - puntosNivelActual;
+      final puntosGanadosEnNivel = puntos - puntosNivelActual;
+      progresoNivel = (puntosGanadosEnNivel / puntosRango).clamp(0.0, 1.0);
+    }
+
+    return TarjetaSuave(
+      padding: const EdgeInsets.all(Tokens.e5),
+      color: Tokens.arenaSuave,
+      colorBorde: Tokens.arena.withValues(alpha: 0.25),
+      sombra: const [],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  puntosSiguienteNivel > 0
+                      ? 'Camino al nivel $nombreSiguienteNivel'
+                      : '¡Has alcanzado el máximo nivel!',
+                  style: tema.textTheme.titleSmall?.copyWith(
+                    color: Tokens.arenaProfundo,
+                  ),
+                ),
+              ),
+              if (puntosSiguienteNivel > 0)
+                Text(
+                  '$puntos / $puntosSiguienteNivel',
+                  style: tema.textTheme.titleSmall?.copyWith(
+                    color: Tokens.arenaProfundo,
+                  ),
+                ),
+            ],
+          ),
+          if (puntosSiguienteNivel > 0) ...[
+            const SizedBox(height: Tokens.e3),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(Tokens.radioPildora),
+              child: LinearProgressIndicator(
+                value: progresoNivel,
+                minHeight: 7,
+                backgroundColor: Colors.white.withValues(alpha: 0.7),
+                valueColor: const AlwaysStoppedAnimation<Color>(Tokens.arena),
+              ),
+            ),
+            const SizedBox(height: Tokens.e3),
+            Text(
+              'Paga a tiempo y suma +20 puntos para ampliar tu límite.',
+              style: tema.textTheme.bodySmall?.copyWith(
+                color: Tokens.arenaProfundo.withValues(alpha: 0.8),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -472,27 +518,32 @@ class _FilaSaldo extends StatelessWidget {
   final Color color;
   final bool esGrande;
 
-  const _FilaSaldo(this.titulo, this.monto, this.color, {this.esGrande = false});
+  const _FilaSaldo(
+    this.titulo,
+    this.monto,
+    this.color, {
+    this.esGrande = false,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final tema = Theme.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(
           titulo,
-          style: GoogleFonts.inter(
-            fontWeight: esGrande ? FontWeight.bold : FontWeight.normal,
-            color: esGrande ? Colors.black87 : Colors.grey[700],
-          ),
+          style: esGrande
+              ? tema.textTheme.titleMedium
+              : tema.textTheme.bodyMedium,
         ),
         Text(
           '\$${monto.toStringAsFixed(2)}',
-          style: GoogleFonts.outfit(
-            fontSize: esGrande ? 20 : 16,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+          style:
+              (esGrande
+                      ? tema.textTheme.headlineSmall
+                      : tema.textTheme.titleLarge)
+                  ?.copyWith(color: color),
         ),
       ],
     );

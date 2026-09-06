@@ -1,16 +1,18 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:uuid/uuid.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:ui';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:uuid/uuid.dart';
+import '../../nucleo/tema/tokens_app.dart';
 import '../../proveedores/supabase_proveedor.dart';
 import '../../servicios/servicio_chat.dart';
+import '../widgets/componentes.dart';
 
-const String idNegocioDemo = '00000000-0000-0000-0000-000000000000'; // Requiere un UUID válido en tu BD
+const String idNegocioDemo =
+    '00000000-0000-0000-0000-000000000000'; // Requiere un UUID válido en tu BD
 
 class PantallaChat extends ConsumerStatefulWidget {
   final String idNegocio;
@@ -80,30 +82,38 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
           'id_negocio': widget.idNegocio,
           'id_cliente': supabase.auth.currentUser?.id ?? 'anonimo',
           'ia_pausada': false,
-          'estado_pedido': 'pagado'
+          'estado_pedido': 'pagado',
         });
       } else {
-        await supabase.from('conversaciones').update({
-          'estado_pedido': 'pagado'
-        }).eq('id', widget.idConversacion);
+        await supabase
+            .from('conversaciones')
+            .update({'estado_pedido': 'pagado'})
+            .eq('id', widget.idConversacion);
       }
 
       await supabase.from('mensajes_chat').insert({
         'id_negocio': widget.idNegocio,
         'id_conversacion': widget.idConversacion,
         'enviado_por': 'humano',
-        'contenido': '¡Tu pago ha sido confirmado exitosamente! Estamos procesando tu pedido.',
+        'contenido':
+            '¡Tu pago ha sido confirmado exitosamente! Estamos procesando tu pedido.',
         'es_imagen': false,
       });
 
       // Enviar a WhatsApp
-      final negocioRes = await supabase.from('negocios').select('telefono').eq('id', widget.idNegocio).maybeSingle();
+      final negocioRes = await supabase
+          .from('negocios')
+          .select('telefono')
+          .eq('id', widget.idNegocio)
+          .maybeSingle();
       final telefonoDb = negocioRes?['telefono'] as String? ?? '';
       final telefonoLimpio = telefonoDb.replaceAll(RegExp(r'[^\d]'), '');
-      
-      final text = Uri.encodeComponent('Hola, acabo de confirmar el pago de mi pedido. El ID de mi conversación es: ${widget.idConversacion}');
+
+      final text = Uri.encodeComponent(
+        'Hola, acabo de confirmar el pago de mi pedido. El ID de mi conversación es: ${widget.idConversacion}',
+      );
       final url = Uri.parse('whatsapp://send?phone=$telefonoLimpio&text=$text');
-      
+
       if (await canLaunchUrl(url)) {
         await launchUrl(url);
       } else {
@@ -113,26 +123,23 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
           await launchUrl(webUrl);
         }
       }
-      
+
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pago confirmado y chat reiniciado'), backgroundColor: Colors.green),
-        );
+        Avisos.exito(context, 'Pago confirmado y chat reiniciado');
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al confirmar pago: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) Avisos.error(context, 'Error al confirmar pago: $e');
     }
   }
 
   Future<void> _subirImagenPago() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+
     if (pickedFile == null) return;
 
     setState(() => _enviandoMensaje = true);
@@ -144,7 +151,9 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
 
       // Subir imagen al bucket pagos
       await supabase.storage.from('pagos').upload(nombreArchivo, archivo);
-      final urlPublica = supabase.storage.from('pagos').getPublicUrl(nombreArchivo);
+      final urlPublica = supabase.storage
+          .from('pagos')
+          .getPublicUrl(nombreArchivo);
 
       // Asegurar que la conversación exista
       final conversacionResult = await supabase
@@ -159,7 +168,7 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
           'id_negocio': widget.idNegocio,
           'id_cliente': supabase.auth.currentUser?.id ?? 'anonimo',
           'ia_pausada': false,
-          'estado_pedido': 'pendiente'
+          'estado_pedido': 'pendiente',
         });
       }
 
@@ -174,11 +183,7 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
 
       _hacerScrollAlFinal();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al subir imagen: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) Avisos.error(context, 'Error al subir imagen: $e');
     } finally {
       if (mounted) setState(() => _enviandoMensaje = false);
     }
@@ -213,7 +218,7 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
           'id_negocio': widget.idNegocio,
           'id_cliente': supabase.auth.currentUser?.id ?? 'anonimo',
           'ia_pausada': false,
-          'estado_pedido': 'pendiente'
+          'estado_pedido': 'pendiente',
         });
       } else {
         iaPausada = conversacionResult['ia_pausada'] ?? false;
@@ -268,270 +273,388 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
   @override
   Widget build(BuildContext context) {
     final supabase = ref.watch(supabaseProveedor);
-    final tema = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: Tokens.lienzo,
       extendBodyBehindAppBar: true,
       appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(70),
-        child: ClipRRect(
+        preferredSize: const Size.fromHeight(76),
+        child: ClipRect(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-            child: AppBar(
-              backgroundColor: tema.colorScheme.surface.withValues(alpha: 0.65),
-              elevation: 0,
-              centerTitle: true,
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [tema.colorScheme.primary, tema.colorScheme.secondary],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: tema.colorScheme.primary.withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        )
+            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Tokens.lienzo.withValues(alpha: 0.82),
+                border: const Border(
+                  bottom: BorderSide(color: Tokens.linea),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: SizedBox(
+                  height: 76,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Tokens.e4,
+                    ),
+                    child: Row(
+                      children: [
+                        BotonCircular(
+                          icono: Icons.arrow_back_rounded,
+                          tooltip: 'Volver',
+                          alPresionar: () => Navigator.maybePop(context),
+                        ),
+                        const SizedBox(width: Tokens.e3),
+                        const _InsigniaAsistente(),
+                        const SizedBox(width: Tokens.e3),
+                        const Expanded(child: _TituloAsistente()),
+                        if (widget.esAdmin)
+                          StreamBuilder<List<Map<String, dynamic>>>(
+                            stream: supabase
+                                .from('conversaciones')
+                                .stream(primaryKey: ['id'])
+                                .eq('id', widget.idConversacion),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              final conversacion = snapshot.data!.first;
+                              final esperandoPago =
+                                  conversacion['estado_pedido'] ==
+                                  'esperando_pago';
+
+                              if (!esperandoPago) return const SizedBox.shrink();
+
+                              return SizedBox(
+                                width: 150,
+                                child: BotonPrincipal(
+                                  texto: 'Confirmar pago',
+                                  altura: 42,
+                                  colorHalo: Tokens.exito,
+                                  degradado: const LinearGradient(
+                                    colors: [
+                                      Color(0xFF7FB894),
+                                      Color(0xFF5C8471),
+                                    ],
+                                  ),
+                                  alPresionar: _confirmarPago,
+                                ),
+                              ).animate().scale(
+                                curve: Curves.easeOutBack,
+                                duration: 400.ms,
+                              );
+                            },
+                          ),
                       ],
                     ),
-                    child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Asistente M&G',
-                        style: GoogleFonts.outfit(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: tema.colorScheme.onSurface,
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.greenAccent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'En línea',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: tema.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-              actions: [
-                if (widget.esAdmin)
-                  StreamBuilder<List<Map<String, dynamic>>>(
-                    stream: supabase
-                        .from('conversaciones')
-                        .stream(primaryKey: ['id'])
-                        .eq('id', widget.idConversacion),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
-                      final conversacion = snapshot.data!.first;
-                      final esperandoPago = conversacion['estado_pedido'] == 'esperando_pago';
-                      
-                      if (esperandoPago) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                          child: FilledButton.icon(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            icon: const Icon(Icons.check_circle_outline, size: 18),
-                            label: const Text('Confirmar Pago'),
-                            onPressed: _confirmarPago,
-                          ).animate().scale(curve: Curves.easeOutBack, duration: 400.ms),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-              ],
             ),
           ),
         ),
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              tema.colorScheme.surface,
-              tema.colorScheme.surfaceContainerLow,
-            ],
-          ),
-        ),
-        child: Column(
-          children: [
-            // Área de Mensajes con StreamBuilder
-            Expanded(
-              child: StreamBuilder<List<Map<String, dynamic>>>(
-                stream: _mensajesStream,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  }
-
-                  final mensajes = snapshot.data ?? [];
-                  
-                  // Hacemos scroll abajo cuando llegan mensajes nuevos
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _hacerScrollAlFinal());
-
-                  return ListView.builder(
-                    controller: _controladorScroll,
-                    padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 80, 16, 16),
-                    itemCount: mensajes.length,
-                    itemBuilder: (context, index) {
-                      final msg = mensajes[index];
-                      final esCliente = msg['enviado_por'] == 'cliente';
-                      final esHumano = msg['enviado_por'] == 'humano';
-                      final esImagen = msg['es_imagen'] ?? false;
-
-                      return BurbujaMensaje(
-                        contenido: msg['contenido'],
-                        esCliente: esCliente,
-                        esHumano: esHumano,
-                        esImagen: esImagen,
-                      ).animate().slideY(begin: 0.1, duration: 400.ms, curve: Curves.easeOutCubic).fadeIn();
-                    },
+      body: Column(
+        children: [
+          // ── Mensajes ─────────────────────────────────────────
+          Expanded(
+            child: StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _mensajesStream,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const Cargando(mensaje: 'Abriendo la conversación…');
+                }
+                if (snapshot.hasError) {
+                  return EstadoVacio(
+                    icono: Icons.cloud_off_rounded,
+                    titulo: 'No pudimos cargar el chat',
+                    mensaje: '${snapshot.error}',
                   );
-                },
+                }
+
+                final mensajes = snapshot.data ?? [];
+
+                // Hacemos scroll abajo cuando llegan mensajes nuevos
+                WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _hacerScrollAlFinal(),
+                );
+
+                final relleno = EdgeInsets.fromLTRB(
+                  Tokens.e5,
+                  MediaQuery.of(context).padding.top + 96,
+                  Tokens.e5,
+                  Tokens.e5,
+                );
+
+                if (mensajes.isEmpty) {
+                  return ListView(
+                    controller: _controladorScroll,
+                    padding: relleno,
+                    children: const [_Bienvenida()],
+                  );
+                }
+
+                return ListView.builder(
+                  controller: _controladorScroll,
+                  padding: relleno,
+                  itemCount: mensajes.length,
+                  itemBuilder: (context, index) {
+                    final msg = mensajes[index];
+                    final esCliente = msg['enviado_por'] == 'cliente';
+                    final esHumano = msg['enviado_por'] == 'humano';
+                    final esImagen = msg['es_imagen'] ?? false;
+
+                    return BurbujaMensaje(
+                      contenido: msg['contenido'],
+                      esCliente: esCliente,
+                      esHumano: esHumano,
+                      esImagen: esImagen,
+                    ).animate().fadeIn(duration: 320.ms).slideY(
+                      begin: 0.12,
+                      curve: Curves.easeOutCubic,
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          // ── Indicador de escritura ───────────────────────────
+          if (_enviandoMensaje)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Tokens.e6,
+                0,
+                Tokens.e6,
+                Tokens.e2,
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: Tokens.e3),
+                  Text(
+                        'El asistente está escribiendo…',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                      .animate(
+                        onPlay: (controller) => controller.repeat(reverse: true),
+                      )
+                      .fade(duration: 700.ms, begin: 0.45),
+                ],
               ),
             ),
 
-            // Indicador de escribiendo
-            if (_enviandoMensaje)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: tema.colorScheme.primary),
+          // ── Redacción ────────────────────────────────────────
+          Container(
+            decoration: const BoxDecoration(
+              color: Tokens.superficie,
+              border: Border(top: BorderSide(color: Tokens.linea)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Tokens.e4,
+                  Tokens.e3,
+                  Tokens.e4,
+                  Tokens.e3,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (!widget.esAdmin) ...[
+                      BotonCircular(
+                        icono: Icons.attach_file_rounded,
+                        tooltip: 'Enviar comprobante',
+                        alPresionar: _enviandoMensaje ? null : _subirImagenPago,
                       ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Escribiendo...',
-                        style: GoogleFonts.inter(
-                          color: tema.colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ).animate(onPlay: (controller) => controller.repeat(reverse: true)).fade(duration: 600.ms),
+                      const SizedBox(width: Tokens.e3),
                     ],
-                  ),
-                ),
-              ),
-
-            // Área de Entrada de Texto
-            ClipRRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: tema.colorScheme.surface.withValues(alpha: 0.7),
-                    border: Border(top: BorderSide(color: tema.colorScheme.outlineVariant.withValues(alpha: 0.2))),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Row(
-                      children: [
-                        if (!widget.esAdmin)
-                          Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            decoration: BoxDecoration(
-                              color: tema.colorScheme.surfaceContainerHighest,
-                              shape: BoxShape.circle,
+                    Expanded(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 120),
+                        child: TextField(
+                          controller: _controladorTexto,
+                          minLines: 1,
+                          maxLines: 4,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: Tokens.tinta),
+                          decoration: InputDecoration(
+                            hintText: 'Escribe tu mensaje…',
+                            filled: true,
+                            fillColor: Tokens.superficieSuave,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: Tokens.e5,
+                              vertical: Tokens.e3 + 2,
                             ),
-                            child: IconButton(
-                              icon: Icon(Icons.add_photo_alternate_rounded, color: tema.colorScheme.primary),
-                              onPressed: _enviandoMensaje ? null : _subirImagenPago,
-                              tooltip: 'Enviar comprobante',
-                            ),
-                          ),
-                        Expanded(
-                          child: TextField(
-                            controller: _controladorTexto,
-                            style: GoogleFonts.inter(),
-                            decoration: InputDecoration(
-                              hintText: 'Escribe un mensaje...',
-                              hintStyle: GoogleFonts.inter(color: tema.colorScheme.onSurfaceVariant),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(28),
-                                borderSide: BorderSide.none,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                Tokens.radioLg,
                               ),
-                              filled: true,
-                              fillColor: tema.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              borderSide: BorderSide.none,
                             ),
-                            onSubmitted: (_) => _enviarMensaje(),
-                            textInputAction: TextInputAction.send,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [tema.colorScheme.primary, tema.colorScheme.secondary],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                Tokens.radioLg,
+                              ),
+                              borderSide: const BorderSide(color: Tokens.linea),
                             ),
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: tema.colorScheme.primary.withValues(alpha: 0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 4),
-                              )
-                            ],
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(
+                                Tokens.radioLg,
+                              ),
+                              borderSide: const BorderSide(
+                                color: Tokens.rosa,
+                                width: 1.5,
+                              ),
+                            ),
                           ),
-                          child: IconButton(
-                            icon: const Icon(Icons.send_rounded, color: Colors.white),
-                            onPressed: _enviandoMensaje ? null : _enviarMensaje,
-                          ),
+                          onSubmitted: (_) => _enviarMensaje(),
+                          textInputAction: TextInputAction.send,
                         ),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: Tokens.e3),
+                    _BotonEnviar(
+                      habilitado: !_enviandoMensaje,
+                      alPresionar: _enviarMensaje,
+                    ),
+                  ],
                 ),
               ),
-            ).animate().slideY(begin: 0.5, duration: 600.ms, curve: Curves.easeOut).fadeIn(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────── Cabecera ───────────────────────────
+
+class _InsigniaAsistente extends StatelessWidget {
+  const _InsigniaAsistente();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        gradient: Tokens.degradadoMarca,
+        shape: BoxShape.circle,
+        boxShadow: Tokens.haloColor(Tokens.rosa),
+      ),
+      child: const Icon(
+        Icons.auto_awesome_rounded,
+        color: Colors.white,
+        size: 18,
+      ),
+    );
+  }
+}
+
+class _TituloAsistente extends StatelessWidget {
+  const _TituloAsistente();
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('Asistente M&G', style: tema.textTheme.titleLarge),
+        Row(
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: Tokens.exito,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text('En línea', style: tema.textTheme.bodySmall),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Tarjeta introductoria cuando aún no hay mensajes en la conversación.
+class _Bienvenida extends StatelessWidget {
+  const _Bienvenida();
+
+  @override
+  Widget build(BuildContext context) {
+    final tema = Theme.of(context);
+    return TarjetaSuave(
+      padding: const EdgeInsets.all(Tokens.e6),
+      sombra: Tokens.sombraMedia,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Antetitulo('Atención al cliente'),
+          const SizedBox(height: Tokens.e3),
+          Text('¿En qué te ayudamos?', style: tema.textTheme.headlineSmall),
+          const SizedBox(height: Tokens.e3),
+          Text(
+            'Pregúntanos por sabores, tamaños, tiempos de entrega o el estado '
+            'de tu pedido. También puedes adjuntar el comprobante de pago con '
+            'el clip.',
+            style: tema.textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 450.ms);
+  }
+}
+
+class _BotonEnviar extends StatelessWidget {
+  final bool habilitado;
+  final VoidCallback alPresionar;
+
+  const _BotonEnviar({required this.habilitado, required this.alPresionar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: habilitado ? 1 : 0.5,
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          gradient: Tokens.degradadoMarca,
+          shape: BoxShape.circle,
+          boxShadow: habilitado ? Tokens.haloColor(Tokens.rosa) : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: habilitado ? alPresionar : null,
+            customBorder: const CircleBorder(),
+            child: const Icon(
+              Icons.arrow_upward_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
         ),
       ),
     );
   }
 }
+
+// ─────────────────────────── Burbujas ───────────────────────────
 
 class BurbujaMensaje extends StatelessWidget {
   final String contenido;
@@ -550,112 +673,99 @@ class BurbujaMensaje extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tema = Theme.of(context);
-    
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: Tokens.e4),
       child: Row(
-        mainAxisAlignment: esCliente ? MainAxisAlignment.end : MainAxisAlignment.start,
+        mainAxisAlignment: esCliente
+            ? MainAxisAlignment.end
+            : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           if (!esCliente) ...[
             Container(
-              padding: const EdgeInsets.all(2),
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
+                color: esHumano ? Tokens.salviaSuave : Tokens.rosaSuave,
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    esHumano ? tema.colorScheme.secondary : tema.colorScheme.tertiary,
-                    esHumano ? tema.colorScheme.secondaryContainer : tema.colorScheme.tertiaryContainer,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+                border: Border.all(
+                  color: (esHumano ? Tokens.salvia : Tokens.rosa).withValues(
+                    alpha: 0.25,
+                  ),
                 ),
               ),
-              child: CircleAvatar(
-                radius: 14,
-                backgroundColor: Colors.transparent,
-                child: Icon(
-                  esHumano ? Icons.support_agent_rounded : Icons.smart_toy_rounded,
-                  size: 16,
-                  color: Colors.white,
-                ),
+              child: Icon(
+                esHumano
+                    ? Icons.support_agent_rounded
+                    : Icons.auto_awesome_rounded,
+                size: 14,
+                color: esHumano ? Tokens.salviaProfundo : Tokens.rosaProfundo,
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: Tokens.e2 + 2),
           ],
           Flexible(
             child: Container(
-              padding: EdgeInsets.all(esImagen ? 4 : 14),
+              constraints: const BoxConstraints(maxWidth: 340),
+              padding: EdgeInsets.all(esImagen ? 5 : Tokens.e4),
               decoration: BoxDecoration(
-                gradient: esCliente
-                    ? LinearGradient(
-                        colors: [
-                          tema.colorScheme.primary,
-                          tema.colorScheme.secondary,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      )
-                    : null,
-                color: esCliente ? null : tema.colorScheme.surface,
+                gradient: esCliente ? Tokens.degradadoMarca : null,
+                color: esCliente ? null : Tokens.superficie,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(20),
-                  topRight: const Radius.circular(20),
-                  bottomLeft: Radius.circular(esCliente ? 20 : 6),
-                  bottomRight: Radius.circular(esCliente ? 6 : 20),
+                  topLeft: const Radius.circular(Tokens.radioMd),
+                  topRight: const Radius.circular(Tokens.radioMd),
+                  bottomLeft: Radius.circular(esCliente ? Tokens.radioMd : 6),
+                  bottomRight: Radius.circular(esCliente ? 6 : Tokens.radioMd),
                 ),
-                border: !esCliente ? Border.all(color: tema.colorScheme.outlineVariant.withValues(alpha: 0.2)) : null,
-                boxShadow: [
-                  BoxShadow(
-                    color: esCliente 
-                        ? tema.colorScheme.primary.withValues(alpha: 0.2)
-                        : Colors.black.withValues(alpha: 0.04),
-                    offset: const Offset(0, 4),
-                    blurRadius: 10,
-                  )
-                ],
+                border: esCliente
+                    ? null
+                    : Border.all(color: Tokens.linea),
+                boxShadow: esCliente
+                    ? Tokens.haloColor(Tokens.rosa)
+                    : Tokens.sombraSuave,
               ),
               child: esImagen
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      contenido,
-                      width: 220,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          width: 220,
-                          height: 220,
-                          color: tema.colorScheme.surfaceContainerHighest,
-                          child: Center(
-                            child: CircularProgressIndicator(color: tema.colorScheme.primary),
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(Tokens.radioSm),
+                      child: Image.network(
+                        contenido,
+                        width: 230,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return const Esqueleto(alto: 200, ancho: 230);
+                        },
+                        errorBuilder: (_, _, _) => Padding(
+                          padding: const EdgeInsets.all(Tokens.e6),
+                          child: Column(
+                            children: [
+                              const Icon(
+                                Icons.broken_image_outlined,
+                                color: Tokens.tintaSuave,
+                                size: 28,
+                              ),
+                              const SizedBox(height: Tokens.e2),
+                              Text(
+                                'Imagen no disponible',
+                                style: tema.textTheme.bodySmall,
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                      errorBuilder: (_, __, ___) => Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          children: [
-                            Icon(Icons.broken_image_rounded, color: tema.colorScheme.onSurfaceVariant, size: 32),
-                            const SizedBox(height: 8),
-                            Text('Imagen no disponible', style: TextStyle(color: tema.colorScheme.onSurfaceVariant)),
-                          ],
                         ),
                       ),
+                    )
+                  : Text(
+                      contenido,
+                      style: tema.textTheme.bodyLarge?.copyWith(
+                        fontSize: 15,
+                        height: 1.5,
+                        color: esCliente ? Colors.white : Tokens.tinta,
+                      ),
                     ),
-                  )
-                : Text(
-                    contenido,
-                    style: GoogleFonts.inter(
-                      color: esCliente ? Colors.white : tema.colorScheme.onSurface,
-                      fontSize: 15,
-                      height: 1.4,
-                    ),
-                  ),
             ),
           ),
-          if (esCliente) const SizedBox(width: 32),
+          if (esCliente) const SizedBox(width: Tokens.e6),
         ],
       ),
     );
