@@ -8,6 +8,15 @@ final proveedorRepositorioAutenticacion = Provider<RepositorioAutenticacion>((
   return RepositorioAutenticacion(ref.read(supabaseProveedor));
 });
 
+/// Error de registro cuyo mensaje ya está redactado para el usuario final.
+class RegistroFallido implements Exception {
+  final String mensaje;
+  const RegistroFallido(this.mensaje);
+
+  @override
+  String toString() => mensaje;
+}
+
 class RepositorioAutenticacion {
   final SupabaseClient _supabase;
 
@@ -26,10 +35,48 @@ class RepositorioAutenticacion {
     );
   }
 
-  // Registro de un nuevo usuario final (cliente) con datos extendidos
-  Future<void> registrarUsuario({
+  /// Crea la cuenta en Supabase Auth y deja la sesión abierta.
+  ///
+  /// Se ejecuta ANTES de subir cualquier archivo: las políticas de Storage
+  /// suelen exigir un usuario autenticado, así que subir primero fallaría.
+  /// Devuelve el `id` del usuario recién creado.
+  Future<String> crearCuentaCliente({
     required String correo,
     required String contrasena,
+  }) async {
+    final respuesta = await _supabase.auth.signUp(
+      email: correo,
+      password: contrasena,
+    );
+
+    final usuario = respuesta.user;
+    if (usuario == null) {
+      throw const RegistroFallido('No se pudo crear la cuenta. Intenta de nuevo.');
+    }
+
+    // Supabase devuelve un usuario con la lista de identidades vacía cuando
+    // el correo ya existe, en lugar de lanzar un error.
+    if (usuario.identities != null && usuario.identities!.isEmpty) {
+      throw const RegistroFallido(
+        'Este correo ya está registrado. Inicia sesión.',
+      );
+    }
+
+    // Sin sesión no podemos subir archivos ni escribir en 'clientes'.
+    if (respuesta.session == null) {
+      throw const RegistroFallido(
+        'Tu cuenta se creó, pero falta confirmar el correo. Revisa tu bandeja '
+        'de entrada y luego inicia sesión.',
+      );
+    }
+
+    return usuario.id;
+  }
+
+  /// Guarda la ficha del cliente en la tabla `clientes`.
+  Future<void> guardarDatosCliente({
+    required String userId,
+    required String correo,
     required String nombre,
     required String cedula,
     required String telefono,
@@ -37,15 +84,7 @@ class RepositorioAutenticacion {
     String? fotoUrl,
     String? fotoCedulaUrl,
   }) async {
-    final respuesta = await _supabase.auth.signUp(
-      email: correo,
-      password: contrasena,
-    );
-    final userId = respuesta.user?.id;
-    if (userId == null) throw Exception('Error al crear la cuenta de usuario.');
-
-    // Insertar en tabla clientes con todos los campos nuevos
-    await _supabase.from('clientes').insert({
+    await _supabase.from('clientes').upsert({
       'id': userId,
       'nombre': nombre,
       'correo': correo,

@@ -1,13 +1,12 @@
-import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:uuid/uuid.dart';
 import '../../nucleo/tema/tokens_app.dart';
 import '../../proveedores/supabase_proveedor.dart';
+import '../../repositorios/repositorio_almacenamiento.dart';
 import '../../servicios/servicio_chat.dart';
 import '../widgets/componentes.dart';
 
@@ -146,14 +145,13 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
 
     try {
       final supabase = ref.read(supabaseProveedor);
-      final archivo = File(pickedFile.path);
-      final nombreArchivo = '${widget.idConversacion}/${const Uuid().v4()}.jpg';
+      final repoAlmacenamiento = ref.read(proveedorRepositorioAlmacenamiento);
 
-      // Subir imagen al bucket pagos
-      await supabase.storage.from('pagos').upload(nombreArchivo, archivo);
-      final urlPublica = supabase.storage
-          .from('pagos')
-          .getPublicUrl(nombreArchivo);
+      // Subir imagen al bucket pagos (bytes, compatible con Web y móvil)
+      final urlPublica = await repoAlmacenamiento.subirComprobantePago(
+        pickedFile,
+        widget.idConversacion,
+      );
 
       // Asegurar que la conversación exista
       final conversacionResult = await supabase

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,8 +28,13 @@ class _PantallaRegistroUsuarioState
 
   bool _cargando = false;
   bool _ocultarContrasena = true;
-  File? _fotoPerfil;
-  File? _fotoCedula;
+
+  // Guardamos el XFile (para subirlo) y sus bytes (para previsualizarlo).
+  // `Image.file` no existe en Web, asi que la vista previa usa `Image.memory`.
+  XFile? _fotoPerfil;
+  Uint8List? _bytesPerfil;
+  XFile? _fotoCedula;
+  Uint8List? _bytesCedula;
   final _picker = ImagePicker();
 
   @override
@@ -48,19 +53,29 @@ class _PantallaRegistroUsuarioState
       source: ImageSource.gallery,
       imageQuality: 70,
     );
-    if (imagen != null) {
-      setState(() => _fotoPerfil = File(imagen.path));
-    }
+    if (imagen == null) return;
+    final bytes = await imagen.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _fotoPerfil = imagen;
+      _bytesPerfil = bytes;
+    });
   }
 
   Future<void> _seleccionarFotoCedula() async {
+    // En móvil abrimos la cámara; en la web de escritorio el selector no
+    // ofrece cámara, así que caemos al explorador de archivos.
     final XFile? imagen = await _picker.pickImage(
-      source: ImageSource.camera, // Usar cámara por defecto para cédula
+      source: kIsWeb ? ImageSource.gallery : ImageSource.camera,
       imageQuality: 80,
     );
-    if (imagen != null) {
-      setState(() => _fotoCedula = File(imagen.path));
-    }
+    if (imagen == null) return;
+    final bytes = await imagen.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _fotoCedula = imagen;
+      _bytesCedula = bytes;
+    });
   }
 
   Future<void> _registrar() async {
@@ -77,18 +92,25 @@ class _PantallaRegistroUsuarioState
     try {
       final repoAuth = ref.read(proveedorRepositorioAutenticacion);
       final repoAlmacenamiento = ref.read(proveedorRepositorioAlmacenamiento);
+      final correo = _controladorCorreo.text.trim();
 
-      // 1. Subir fotos (perfil y cédula)
+      // 1. Crear la cuenta primero: las subidas y el insert necesitan sesión.
+      final userId = await repoAuth.crearCuentaCliente(
+        correo: correo,
+        contrasena: _controladorContrasena.text,
+      );
+
+      // 2. Subir fotos (perfil y cédula) ya autenticados.
       final urlFoto = await repoAlmacenamiento.subirArchivoPerfil(_fotoPerfil!);
       final urlCedula = await repoAlmacenamiento.subirArchivoCedula(
         _fotoCedula!,
       );
 
-      // 2. Registrar usuario y guardar todos los datos en tabla 'clientes'
-      await repoAuth.registrarUsuario(
+      // 3. Guardar la ficha del cliente.
+      await repoAuth.guardarDatosCliente(
+        userId: userId,
         nombre: _controladorNombre.text.trim(),
-        correo: _controladorCorreo.text.trim(),
-        contrasena: _controladorContrasena.text,
+        correo: correo,
         cedula: _controladorCedula.text.trim(),
         telefono: _controladorTelefono.text.trim(),
         direccion: _controladorDireccion.text.trim(),
@@ -113,19 +135,43 @@ class _PantallaRegistroUsuarioState
           );
         }
       }
+    } on RegistroFallido catch (e) {
+      // El repositorio ya redactó un mensaje apto para el usuario.
+      if (mounted) Avisos.error(context, e.mensaje);
     } catch (e) {
-      if (mounted) {
-        final errorStr = e.toString().toLowerCase();
-        final mensajeError =
-            errorStr.contains('already registered') ||
-                errorStr.contains('user_already_exists')
-            ? 'Este correo ya está registrado. Inicia sesión.'
-            : 'Error: ${e.toString()}';
-        Avisos.error(context, mensajeError);
-      }
+      if (mounted) Avisos.error(context, _mensajeDeError(e));
     } finally {
       if (mounted) setState(() => _cargando = false);
     }
+  }
+
+  /// Traduce los errores técnicos a algo accionable para el usuario.
+  String _mensajeDeError(Object e) {
+    final texto = e.toString();
+    final minus = texto.toLowerCase();
+
+    if (minus.contains('already registered') ||
+        minus.contains('user_already_exists')) {
+      return 'Este correo ya está registrado. Inicia sesión.';
+    }
+    if (minus.contains('bucket not found')) {
+      return 'Falta configurar el almacenamiento de imágenes en Supabase.';
+    }
+    if (minus.contains('row-level security') ||
+        minus.contains('violates row-level') ||
+        minus.contains('unauthorized')) {
+      return 'No tienes permiso para guardar estos datos. Revisa las políticas '
+          'de Supabase.';
+    }
+    if (minus.contains('failed host lookup') ||
+        minus.contains('socketexception') ||
+        minus.contains('clientexception')) {
+      return 'Sin conexión con el servidor. Revisa tu internet.';
+    }
+    if (minus.contains('password')) {
+      return 'La contraseña no cumple los requisitos mínimos.';
+    }
+    return 'No pudimos completar el registro: $texto';
   }
 
   @override
@@ -192,7 +238,7 @@ class _PantallaRegistroUsuarioState
                             // ── Retrato ────────────────────────────
                             Center(
                               child: _SelectorRetrato(
-                                archivo: _fotoPerfil,
+                                bytes: _bytesPerfil,
                                 alTocar: _seleccionarFotoPerfil,
                               ),
                             ),
@@ -235,7 +281,7 @@ class _PantallaRegistroUsuarioState
                                       : null,
                                 ),
                                 _CapturaCedula(
-                                  archivo: _fotoCedula,
+                                  bytes: _bytesCedula,
                                   alTocar: _seleccionarFotoCedula,
                                 ),
                               ],
@@ -381,10 +427,10 @@ class _Seccion extends StatelessWidget {
 
 /// Avatar circular con borde punteado sutil para elegir el retrato.
 class _SelectorRetrato extends StatelessWidget {
-  final File? archivo;
+  final Uint8List? bytes;
   final VoidCallback alTocar;
 
-  const _SelectorRetrato({required this.archivo, required this.alTocar});
+  const _SelectorRetrato({required this.bytes, required this.alTocar});
 
   @override
   Widget build(BuildContext context) {
@@ -401,9 +447,9 @@ class _SelectorRetrato extends StatelessWidget {
         ),
         padding: const EdgeInsets.all(5),
         child: ClipOval(
-          child: archivo != null
-              ? Image.file(
-                  archivo!,
+          child: bytes != null
+              ? Image.memory(
+                  bytes!,
                   fit: BoxFit.cover,
                   width: double.infinity,
                   height: double.infinity,
@@ -424,10 +470,10 @@ class _SelectorRetrato extends StatelessWidget {
 
 /// Zona de captura de la cédula con estado vacío/lleno diferenciado.
 class _CapturaCedula extends StatelessWidget {
-  final File? archivo;
+  final Uint8List? bytes;
   final VoidCallback alTocar;
 
-  const _CapturaCedula({required this.archivo, required this.alTocar});
+  const _CapturaCedula({required this.bytes, required this.alTocar});
 
   @override
   Widget build(BuildContext context) {
@@ -446,7 +492,7 @@ class _CapturaCedula extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (archivo != null)
+              if (bytes != null)
                 const Pildora(
                   texto: 'Listo',
                   icono: Icons.check_rounded,
@@ -462,16 +508,20 @@ class _CapturaCedula extends StatelessWidget {
             height: 160,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: archivo == null ? Tokens.superficieSuave : Colors.white,
+              color: bytes == null ? Tokens.superficieSuave : Colors.white,
               borderRadius: BorderRadius.circular(Tokens.radioSm),
               border: Border.all(
-                color: archivo == null ? Tokens.lineaFuerte : Tokens.exito,
+                color: bytes == null ? Tokens.lineaFuerte : Tokens.exito,
               ),
             ),
-            child: archivo != null
+            child: bytes != null
                 ? ClipRRect(
                     borderRadius: BorderRadius.circular(Tokens.radioSm - 1),
-                    child: Image.file(archivo!, fit: BoxFit.cover),
+                    child: Image.memory(
+                      bytes!,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                    ),
                   )
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
