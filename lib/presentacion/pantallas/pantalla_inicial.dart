@@ -13,6 +13,11 @@ import 'pantalla_chat.dart';
 import 'pantalla_club_mg.dart';
 import 'pantalla_perfil.dart';
 
+/// Alto de la barra de categorías. El `flexibleSpace` de un SliverAppBar se
+/// dibuja detrás del `bottom`, así que la cabecera reserva este espacio para
+/// que la tarjeta de saludo no quede pisada por los filtros.
+const double _altoFiltros = 62;
+
 class PantallaInicial extends ConsumerStatefulWidget {
   const PantallaInicial({super.key});
 
@@ -172,7 +177,7 @@ class _PantallaInicialState extends ConsumerState<PantallaInicial> {
           slivers: [
             // ── Cabecera editorial ───────────────────────────────
             SliverAppBar(
-              expandedHeight: 268,
+              expandedHeight: 300,
               pinned: true,
               stretch: true,
               backgroundColor: Tokens.lienzo,
@@ -190,9 +195,9 @@ class _PantallaInicialState extends ConsumerState<PantallaInicial> {
                 ),
               ),
               bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(62),
+                preferredSize: const Size.fromHeight(_altoFiltros),
                 child: Container(
-                  height: 62,
+                  height: _altoFiltros,
                   alignment: Alignment.centerLeft,
                   color: Tokens.lienzo,
                   child: ListView.separated(
@@ -350,6 +355,7 @@ class _CabeceraInicio extends StatelessWidget {
     final tema = Theme.of(context);
 
     return Container(
+      margin: const EdgeInsets.only(bottom: _altoFiltros),
       decoration: const BoxDecoration(
         gradient: Tokens.degradadoAmanecer,
         borderRadius: BorderRadius.vertical(
@@ -363,7 +369,7 @@ class _CabeceraInicio extends StatelessWidget {
             Tokens.e5,
             Tokens.e3,
             Tokens.e5,
-            Tokens.e6,
+            Tokens.e5,
           ),
           child: Column(
             children: [
