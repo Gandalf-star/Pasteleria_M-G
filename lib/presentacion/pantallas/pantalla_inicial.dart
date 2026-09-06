@@ -13,10 +13,12 @@ import 'pantalla_chat.dart';
 import 'pantalla_club_mg.dart';
 import 'pantalla_perfil.dart';
 
-/// Alto de la barra de categorías. El `flexibleSpace` de un SliverAppBar se
-/// dibuja detrás del `bottom`, así que la cabecera reserva este espacio para
-/// que la tarjeta de saludo no quede pisada por los filtros.
-const double _altoFiltros = 62;
+/// Alto de la fila de categorías.
+///
+/// El saludo y los filtros son slivers independientes a propósito: cuando el
+/// saludo vivía dentro del `flexibleSpace` de un SliverAppBar, el `bottom` y
+/// el contenido se pintaban encima y lo tapaban.
+const double _altoFiltros = 60;
 
 class PantallaInicial extends ConsumerStatefulWidget {
   const PantallaInicial({super.key});
@@ -175,50 +177,75 @@ class _PantallaInicialState extends ConsumerState<PantallaInicial> {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ── Cabecera editorial ───────────────────────────────
+            // ── Barra fija: menú · marca · carrito ──────────────
             SliverAppBar(
-              expandedHeight: 300,
               pinned: true,
-              stretch: true,
+              toolbarHeight: 64,
               backgroundColor: Tokens.lienzo,
               surfaceTintColor: Colors.transparent,
               elevation: 0,
+              scrolledUnderElevation: 0,
               automaticallyImplyLeading: false,
-              flexibleSpace: FlexibleSpaceBar(
-                background: _CabeceraInicio(
-                  saludo: _saludo,
-                  nombre: _nombreUsuario,
-                  fotoUrl: _fotoPerfilUrl,
-                  iniciales: _obtenerIniciales(),
-                  cantidadCarrito: cantidadCarrito,
-                  alAbrirCarrito: _abrirCarrito,
+              titleSpacing: 0,
+              title: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Tokens.e5),
+                child: Row(
+                  children: [
+                    Builder(
+                      builder: (context) => BotonCircular(
+                        icono: Icons.menu_rounded,
+                        tooltip: 'Menú',
+                        alPresionar: () => Scaffold.of(context).openDrawer(),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        'Pastelería M&G',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                    ),
+                    _BotonCarritoCabecera(
+                      cantidad: cantidadCarrito,
+                      alPresionar: _abrirCarrito,
+                    ),
+                  ],
                 ),
               ),
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(_altoFiltros),
-                child: Container(
-                  height: _altoFiltros,
-                  alignment: Alignment.centerLeft,
-                  color: Tokens.lienzo,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Tokens.e5,
-                      vertical: Tokens.e2 + 2,
-                    ),
-                    itemCount: _categorias.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(width: Tokens.e2 + 2),
-                    itemBuilder: (context, index) {
-                      final cat = _categorias[index];
-                      return _ChipFiltro(
-                        etiqueta: cat,
-                        seleccionado: _filtroCategoria == cat,
-                        onTap: () => setState(() => _filtroCategoria = cat),
-                      );
-                    },
+            ),
+
+            // ── Saludo: sliver propio, nada puede pintarse encima ────
+            SliverToBoxAdapter(
+              child: _CabeceraInicio(
+                saludo: _saludo,
+                nombre: _nombreUsuario,
+                fotoUrl: _fotoPerfilUrl,
+                iniciales: _obtenerIniciales(),
+              ),
+            ),
+
+            // ── Filtros de categoría ──────────────────────
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: _altoFiltros,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Tokens.e5,
+                    vertical: Tokens.e3,
                   ),
+                  itemCount: _categorias.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: Tokens.e2 + 2),
+                  itemBuilder: (context, index) {
+                    final cat = _categorias[index];
+                    return _ChipFiltro(
+                      etiqueta: cat,
+                      seleccionado: _filtroCategoria == cat,
+                      onTap: () => setState(() => _filtroCategoria = cat),
+                    );
+                  },
                 ),
               ),
             ),
@@ -228,7 +255,7 @@ class _PantallaInicialState extends ConsumerState<PantallaInicial> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
                   Tokens.e5,
-                  Tokens.e5,
+                  Tokens.e4,
                   Tokens.e5,
                   Tokens.e4,
                 ),
@@ -338,16 +365,12 @@ class _CabeceraInicio extends StatelessWidget {
   final String nombre;
   final String? fotoUrl;
   final String iniciales;
-  final int cantidadCarrito;
-  final VoidCallback alAbrirCarrito;
 
   const _CabeceraInicio({
     required this.saludo,
     required this.nombre,
     required this.fotoUrl,
     required this.iniciales,
-    required this.cantidadCarrito,
-    required this.alAbrirCarrito,
   });
 
   @override
@@ -355,111 +378,50 @@ class _CabeceraInicio extends StatelessWidget {
     final tema = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: _altoFiltros),
-      decoration: const BoxDecoration(
+      margin: const EdgeInsets.fromLTRB(Tokens.e5, 0, Tokens.e5, Tokens.e2),
+      padding: const EdgeInsets.all(Tokens.e5),
+      decoration: BoxDecoration(
         gradient: Tokens.degradadoAmanecer,
-        borderRadius: BorderRadius.vertical(
-          bottom: Radius.circular(Tokens.radioXl),
-        ),
+        borderRadius: BorderRadius.circular(Tokens.radioXl),
+        border: Border.all(color: Colors.white),
+        boxShadow: Tokens.sombraMedia,
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(
-            Tokens.e5,
-            Tokens.e3,
-            Tokens.e5,
-            Tokens.e5,
-          ),
-          child: Column(
-            children: [
-              // Barra superior: menú · marca · carrito
-              Row(
-                children: [
-                  Builder(
-                    builder: (context) => BotonCircular(
-                      icono: Icons.menu_rounded,
-                      tooltip: 'Menú',
-                      alPresionar: () => Scaffold.of(context).openDrawer(),
-                    ),
+      child: Row(
+        children: [
+          _Retrato(fotoUrl: fotoUrl, iniciales: iniciales, radio: 26),
+          const SizedBox(width: Tokens.e4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  saludo,
+                  style: tema.textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.6,
                   ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          'PASTELERÍA',
-                          style: tema.textTheme.labelSmall?.copyWith(
-                            letterSpacing: 3,
-                            color: Tokens.rosaProfundo,
-                          ),
-                        ),
-                        Text(
-                          'M&G',
-                          style: tema.textTheme.headlineMedium?.copyWith(
-                            letterSpacing: 1,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _BotonCarritoCabecera(
-                    cantidad: cantidadCarrito,
-                    alPresionar: alAbrirCarrito,
-                  ),
-                ],
-              ),
-
-              const Spacer(),
-
-              // Saludo personalizado
-              TarjetaSuave(
-                padding: const EdgeInsets.all(Tokens.e4),
-                sombra: Tokens.sombraMedia,
-                colorBorde: Colors.white,
-                child: Row(
-                  children: [
-                    _Retrato(
-                      fotoUrl: fotoUrl,
-                      iniciales: iniciales,
-                      radio: 26,
-                    ),
-                    const SizedBox(width: Tokens.e4),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            saludo,
-                            style: tema.textTheme.labelSmall?.copyWith(
-                              letterSpacing: 1.6,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            nombre,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: tema.textTheme.headlineSmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Pildora(
-                      texto: 'Club M&G',
-                      icono: Icons.workspace_premium_rounded,
-                      color: Tokens.arenaProfundo,
-                      compacta: true,
-                    ),
-                  ],
                 ),
-              ).animate().fadeIn(duration: 500.ms).slideY(
-                begin: 0.16,
-                curve: Curves.easeOutCubic,
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  nombre,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: tema.textTheme.headlineSmall,
+                ),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(width: Tokens.e2),
+          const Pildora(
+            texto: 'Club M&G',
+            icono: Icons.workspace_premium_rounded,
+            color: Tokens.arenaProfundo,
+            compacta: true,
+          ),
+        ],
       ),
+    ).animate().fadeIn(duration: 450.ms).slideY(
+      begin: 0.12,
+      curve: Curves.easeOutCubic,
     );
   }
 }

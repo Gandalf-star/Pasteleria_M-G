@@ -136,6 +136,66 @@
     });
   </script>
 
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // `flutter_bootstrap.js` también quedó cacheado como "immutable" en
+    // despliegues anteriores. Lo pedimos con una versión en la URL para que el
+    // navegador se vea obligado a descargarlo de nuevo.
+    (function () {
+      var script = document.createElement('script');
+      script.src = 'flutter_bootstrap.js?v=' + Date.now();
+      script.async = true;
+      document.body.appendChild(script);
+    })();
+  </script>
+
+  <script>
+    // Auto-actualización tras un despliegue.
+    //
+    // Las cabeceras `no-store` garantizan que una recarga traiga la versión
+    // nueva, pero un teléfono con la app ya abierta seguiría ejecutando la
+    // anterior hasta que el usuario recargue. Aquí comparamos la huella
+    // (ETag / Last-Modified) de `main.dart.js` contra la que había al arrancar
+    // y recargamos cuando cambia.
+    (function () {
+      var huellaInicial = null;
+      var recargando = false;
+
+      function leerHuella() {
+        // El parámetro evita cualquier intermediario que ignore `no-store`.
+        return fetch('main.dart.js?check=' + Date.now(), {
+          method: 'HEAD',
+          cache: 'no-store'
+        }).then(function (respuesta) {
+          if (!respuesta.ok) return null;
+          return respuesta.headers.get('etag') ||
+                 respuesta.headers.get('last-modified') ||
+                 respuesta.headers.get('content-length');
+        }).catch(function () {
+          return null; // Sin conexión: lo reintentamos más tarde.
+        });
+      }
+
+      function comprobar() {
+        if (recargando || document.visibilityState !== 'visible') return;
+        leerHuella().then(function (huella) {
+          if (!huella) return;
+          if (huellaInicial === null) {
+            huellaInicial = huella;
+            return;
+          }
+          if (huella !== huellaInicial) {
+            recargando = true;
+            window.location.reload();
+          }
+        });
+      }
+
+      window.addEventListener('flutter-first-frame', comprobar);
+      // Al volver a la app: el momento natural para recargar sin interrumpir.
+      document.addEventListener('visibilitychange', comprobar);
+      // Y de forma periódica para sesiones largas dejadas abiertas.
+      setInterval(comprobar, 5 * 60 * 1000);
+    })();
+  </script>
 </body>
 </html>
