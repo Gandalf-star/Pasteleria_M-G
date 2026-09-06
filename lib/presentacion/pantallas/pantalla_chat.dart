@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../nucleo/tema/tokens_app.dart';
+import '../../nucleo/utilidades/enlaces.dart';
 import '../../proveedores/supabase_proveedor.dart';
 import '../../repositorios/repositorio_almacenamiento.dart';
 import '../../servicios/servicio_chat.dart';
@@ -108,19 +108,16 @@ class _PantallaChatState extends ConsumerState<PantallaChat> {
       final telefonoDb = negocioRes?['telefono'] as String? ?? '';
       final telefonoLimpio = telefonoDb.replaceAll(RegExp(r'[^\d]'), '');
 
-      final text = Uri.encodeComponent(
-        'Hola, acabo de confirmar el pago de mi pedido. El ID de mi conversación es: ${widget.idConversacion}',
+      // Siempre `wa.me`: el esquema `whatsapp://` no existe en la web y en
+      // iOS el enlace universal abre la app igualmente si está instalada.
+      final uri = Enlaces.whatsapp(
+        telefono: telefonoLimpio,
+        mensaje:
+            'Hola, acabo de confirmar el pago de mi pedido. '
+            'El ID de mi conversación es: ${widget.idConversacion}',
       );
-      final url = Uri.parse('whatsapp://send?phone=$telefonoLimpio&text=$text');
-
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url);
-      } else {
-        // Fallback a web si no tiene WhatsApp instalado
-        final webUrl = Uri.parse('https://wa.me/$telefonoLimpio?text=$text');
-        if (await canLaunchUrl(webUrl)) {
-          await launchUrl(webUrl);
-        }
+      if (uri != null) {
+        await Enlaces.abrir(uri);
       }
 
       if (mounted) {

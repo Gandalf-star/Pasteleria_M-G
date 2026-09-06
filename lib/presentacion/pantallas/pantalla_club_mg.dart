@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../nucleo/constantes/entorno.dart';
 import '../../nucleo/tema/tokens_app.dart';
+import '../../nucleo/utilidades/enlaces.dart';
 import '../../proveedores/supabase_proveedor.dart';
 import '../../repositorios/repositorio_credito.dart';
 import '../widgets/componentes.dart';
@@ -472,12 +472,9 @@ class _TarjetaPlanState extends ConsumerState<_TarjetaPlan> {
 
     // Si no hay número en DB, usamos uno por defecto
     final numeroFinal = numeroAdmin.isEmpty ? "584240000000" : numeroAdmin;
-    final uri = Uri.parse(
-      "https://wa.me/$numeroFinal?text=${Uri.encodeComponent(mensaje)}",
-    );
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    final uri = Enlaces.whatsapp(telefono: numeroFinal, mensaje: mensaje);
+    if (uri != null) {
+      await Enlaces.abrir(uri);
     }
 
     _cargarCuotas(); // Refrescar

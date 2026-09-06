@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../nucleo/constantes/entorno.dart';
 import '../../nucleo/tema/tokens_app.dart';
+import '../../nucleo/utilidades/enlaces.dart';
 import '../../proveedores/proveedor_carrito.dart';
 import '../../proveedores/supabase_proveedor.dart';
 import '../../repositorios/repositorio_autenticacion.dart';
@@ -19,6 +19,32 @@ class PantallaCarrito extends ConsumerStatefulWidget {
 
 class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
   bool _procesando = false;
+
+  /// Teléfono del negocio, cargado al entrar a la pantalla para no tener que
+  /// consultarlo justo antes de abrir WhatsApp.
+  String? _telefonoNegocio;
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarTelefonoNegocio();
+  }
+
+  Future<void> _cargarTelefonoNegocio() async {
+    try {
+      final res = await ref
+          .read(supabaseProveedor)
+          .from('negocios')
+          .select('telefono')
+          .eq('id', Entorno.idSweetBites)
+          .maybeSingle();
+      if (mounted) {
+        setState(() => _telefonoNegocio = res?['telefono'] as String? ?? '');
+      }
+    } catch (e) {
+      debugPrint('Error cargando el teléfono del negocio: $e');
+    }
+  }
 
   /// Diálogo de registro requerido, compartido por ambos flujos de pedido.
   Future<bool> _verificarCliente(String motivo) async {
@@ -63,25 +89,75 @@ class _PantallaCarritoState extends ConsumerState<PantallaCarrito> {
   }
 
   /// Abre WhatsApp con el mensaje ya redactado.
+  ///
+  /// Si el navegador impide la apertura automática, en lugar de fallar en
+  /// silencio mostramos un diálogo con un botón: ese toque es un gesto nuevo
+  /// del usuario y sí tiene permiso para navegar.
   Future<void> _abrirWhatsapp(String mensaje) async {
-    final supabase = ref.read(supabaseProveedor);
-    final negocioRes = await supabase
-        .from('negocios')
-        .select('telefono')
-        .eq('id', Entorno.idSweetBites)
-        .maybeSingle();
-    final telefonoDb = negocioRes?['telefono'] as String? ?? '';
-    final numeroAdmin = telefonoDb.replaceAll(RegExp(r'[^\d]'), '');
-
-    final uri = Uri.parse(
-      'https://wa.me/$numeroAdmin?text=${Uri.encodeComponent(mensaje)}',
-    );
-
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      throw Exception('No se pudo abrir WhatsApp');
+    var telefono = _telefonoNegocio;
+    if (telefono == null || telefono.isEmpty) {
+      final res = await ref
+          .read(supabaseProveedor)
+          .from('negocios')
+          .select('telefono')
+          .eq('id', Entorno.idSweetBites)
+          .maybeSingle();
+      telefono = res?['telefono'] as String? ?? '';
     }
+
+    final uri = Enlaces.whatsapp(telefono: telefono, mensaje: mensaje);
+    if (uri == null) {
+      throw Exception(
+        'El negocio no tiene un número de WhatsApp configurado.',
+      );
+    }
+
+    final abierto = await Enlaces.abrir(uri);
+    if (!abierto && mounted) {
+      await _ofrecerAperturaManual(uri);
+    }
+  }
+
+  /// Último recurso: el usuario abre WhatsApp con un toque explícito.
+  Future<void> _ofrecerAperturaManual(Uri uri) async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(
+          Icons.open_in_new_rounded,
+          color: Tokens.whatsapp,
+          size: 28,
+        ),
+        title: const Text('Abre WhatsApp para enviarlo'),
+        content: const Text(
+          'Tu pedido quedó registrado. Toca el botón para enviarnos el '
+          'resumen por WhatsApp.',
+          textAlign: TextAlign.center,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(
+          Tokens.e5,
+          0,
+          Tokens.e5,
+          Tokens.e5,
+        ),
+        actions: [
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: Tokens.whatsapp,
+              ),
+              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+              label: const Text('Abrir WhatsApp'),
+              onPressed: () {
+                Navigator.pop(context);
+                Enlaces.abrir(uri);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _detalleItems(List<ItemCarrito> items) {
