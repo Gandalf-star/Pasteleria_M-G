@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../nucleo/tema/tokens_app.dart';
+import '../../../nucleo/utilidades/validadores.dart';
 import '../../../repositorios/repositorio_autenticacion.dart';
 import '../../widgets/componentes.dart';
 import 'pantalla_registro_usuario.dart';
@@ -54,15 +55,16 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
 
     try {
       final repoAuth = ref.read(proveedorRepositorioAutenticacion);
-      await repoAuth.iniciarSesion(
-        _controladorCorreo.text.trim(),
-        _controladorContrasena.text,
-      );
+      // Mismo criterio que en el registro: Supabase guarda el correo en
+      // minúsculas, así que lo normalizamos para que coincida.
+      final correo = Validadores.normalizarCorreo(_controladorCorreo.text);
+
+      await repoAuth.iniciarSesion(correo, _controladorContrasena.text);
 
       final prefs = await SharedPreferences.getInstance();
       if (_recordarContrasena) {
         await prefs.setBool('recordar_contrasena', true);
-        await prefs.setString('correo', _controladorCorreo.text.trim());
+        await prefs.setString('correo', correo);
         await prefs.setString('contrasena', _controladorContrasena.text);
       } else {
         await prefs.remove('recordar_contrasena');
@@ -172,9 +174,7 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                                     pista: 'tucorreo@ejemplo.com',
                                     icono: Icons.alternate_email_rounded,
                                     teclado: TextInputType.emailAddress,
-                                    validador: (v) => (v ?? '').contains('@')
-                                        ? null
-                                        : 'Ingresa un correo válido',
+                                    validador: Validadores.correo,
                                   ),
                                   const SizedBox(height: Tokens.e5),
                                   CampoTexto(
@@ -196,9 +196,7 @@ class _PantallaLoginState extends ConsumerState<PantallaLogin> {
                                             !_ocultarContrasena,
                                       ),
                                     ),
-                                    validador: (v) => (v ?? '').length < 6
-                                        ? 'Mínimo 6 caracteres'
-                                        : null,
+                                    validador: Validadores.contrasena,
                                   ),
                                   const SizedBox(height: Tokens.e4),
                                   Row(

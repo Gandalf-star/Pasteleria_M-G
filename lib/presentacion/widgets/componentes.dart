@@ -533,21 +533,37 @@ class CampoTexto extends StatelessWidget {
             ),
           ),
         ),
-        TextFormField(
-          controller: controlador,
-          obscureText: esClave,
-          keyboardType: teclado,
-          maxLines: esClave ? 1 : maxLineas,
-          validator: validador,
-          onFieldSubmitted: alEnviar,
-          style: tema.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w500,
-          ),
-          decoration: InputDecoration(
-            hintText: pista,
-            prefixIcon: icono == null ? null : Icon(icono, size: 19),
-            suffixIcon: sufijo,
-          ),
+        Builder(
+          builder: (context) {
+            // Los teclados móviles autocapitalizan y autocorrigen por defecto:
+            // convierten "luis@gmail.com" en "Luis@gmail.com" o le añaden
+            // sugerencias, y Supabase acaba rechazando el correo. Para correo y
+            // contraseña desactivamos ambas ayudas.
+            final esTextoSensible =
+                esClave || teclado == TextInputType.emailAddress;
+
+            return TextFormField(
+              controller: controlador,
+              obscureText: esClave,
+              keyboardType: teclado,
+              maxLines: esClave ? 1 : maxLineas,
+              validator: validador,
+              onFieldSubmitted: alEnviar,
+              autocorrect: !esTextoSensible,
+              enableSuggestions: !esTextoSensible,
+              textCapitalization: esTextoSensible
+                  ? TextCapitalization.none
+                  : TextCapitalization.sentences,
+              style: tema.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+              decoration: InputDecoration(
+                hintText: pista,
+                prefixIcon: icono == null ? null : Icon(icono, size: 19),
+                suffixIcon: sufijo,
+              ),
+            );
+          },
         ),
       ],
     );

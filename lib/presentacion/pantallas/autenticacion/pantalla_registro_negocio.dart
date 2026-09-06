@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../nucleo/constantes/tipos_negocio.dart';
 import '../../../nucleo/tema/tokens_app.dart';
+import '../../../nucleo/utilidades/validadores.dart';
 import '../../../repositorios/repositorio_autenticacion.dart';
 import '../../widgets/componentes.dart';
 
@@ -45,7 +46,7 @@ class _PantallaRegistroNegocioState
     try {
       final auth = ref.read(proveedorRepositorioAutenticacion);
       await auth.registrarNegocio(
-        correo: _correoCtrl.text.trim(),
+        correo: Validadores.normalizarCorreo(_correoCtrl.text),
         contrasena: _contrasenaCtrl.text,
         nombreNegocio: _nombreNegocioCtrl.text.trim(),
         telefono: _telefonoCtrl.text.trim(),
@@ -404,10 +405,7 @@ class _PantallaRegistroNegocioState
                                     etiqueta: 'Nombre del negocio',
                                     pista: 'Cómo te conocen tus clientes',
                                     icono: Icons.storefront_outlined,
-                                    validador: (v) =>
-                                        (v == null || v.trim().isEmpty)
-                                        ? 'Campo requerido'
-                                        : null,
+                                    validador: Validadores.requerido,
                                   ),
                                   const SizedBox(height: Tokens.e5),
                                   CampoTexto(
@@ -416,15 +414,7 @@ class _PantallaRegistroNegocioState
                                     pista: 'contacto@tunegocio.com',
                                     icono: Icons.alternate_email_rounded,
                                     teclado: TextInputType.emailAddress,
-                                    validador: (v) {
-                                      if (v == null || v.trim().isEmpty) {
-                                        return 'Campo requerido';
-                                      }
-                                      if (!v.contains('@')) {
-                                        return 'Correo inválido';
-                                      }
-                                      return null;
-                                    },
+                                    validador: Validadores.correo,
                                   ),
                                   const SizedBox(height: Tokens.e5),
                                   CampoTexto(
@@ -433,10 +423,7 @@ class _PantallaRegistroNegocioState
                                     pista: 'Con código de país',
                                     icono: Icons.phone_iphone_rounded,
                                     teclado: TextInputType.phone,
-                                    validador: (v) =>
-                                        (v == null || v.trim().isEmpty)
-                                        ? 'Campo requerido'
-                                        : null,
+                                    validador: Validadores.requerido,
                                   ),
                                   const SizedBox(height: Tokens.e5),
                                   CampoTexto(
@@ -457,15 +444,7 @@ class _PantallaRegistroNegocioState
                                             !_mostrarContrasena,
                                       ),
                                     ),
-                                    validador: (v) {
-                                      if (v == null || v.isEmpty) {
-                                        return 'Campo requerido';
-                                      }
-                                      if (v.length < 6) {
-                                        return 'Mínimo 6 caracteres';
-                                      }
-                                      return null;
-                                    },
+                                    validador: Validadores.contrasena,
                                   ),
                                 ],
                               ),

@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../nucleo/tema/tokens_app.dart';
+import '../../../nucleo/utilidades/validadores.dart';
 import '../../../repositorios/repositorio_almacenamiento.dart';
 import '../../../repositorios/repositorio_autenticacion.dart';
 import '../../widgets/componentes.dart';
@@ -92,7 +93,9 @@ class _PantallaRegistroUsuarioState
     try {
       final repoAuth = ref.read(proveedorRepositorioAutenticacion);
       final repoAlmacenamiento = ref.read(proveedorRepositorioAlmacenamiento);
-      final correo = _controladorCorreo.text.trim();
+      final correo = Validadores.normalizarCorreo(
+        _controladorCorreo.text,
+      );
 
       // 1. Crear la cuenta primero: las subidas y el insert necesitan sesión.
       final userId = await repoAuth.crearCuentaCliente(
@@ -153,6 +156,20 @@ class _PantallaRegistroUsuarioState
     if (minus.contains('already registered') ||
         minus.contains('user_already_exists')) {
       return 'Este correo ya está registrado. Inicia sesión.';
+    }
+    if (minus.contains('unable to validate email') ||
+        minus.contains('validation_failed') ||
+        minus.contains('invalid format')) {
+      return 'El correo no tiene un formato válido. Revísalo e inténtalo '
+          'de nuevo.';
+    }
+    if (minus.contains('rate limit') || minus.contains('too many requests')) {
+      return 'Demasiados intentos seguidos. Espera unos minutos.';
+    }
+    if (minus.contains('signups not allowed') ||
+        minus.contains('signup is disabled')) {
+      return 'El registro está desactivado en el servidor. Actívalo en '
+          'Supabase → Authentication → Providers.';
     }
     if (minus.contains('bucket not found')) {
       return 'Falta configurar el almacenamiento de imágenes en Supabase.';
@@ -266,9 +283,7 @@ class _PantallaRegistroUsuarioState
                                   etiqueta: 'Nombre completo',
                                   pista: 'Nombre y apellido',
                                   icono: Icons.person_outline_rounded,
-                                  validador: (v) => (v ?? '').trim().isEmpty
-                                      ? 'Requerido'
-                                      : null,
+                                  validador: Validadores.requerido,
                                 ),
                                 CampoTexto(
                                   controlador: _controladorCedula,
@@ -276,9 +291,7 @@ class _PantallaRegistroUsuarioState
                                   pista: 'Solo dígitos',
                                   icono: Icons.badge_outlined,
                                   teclado: TextInputType.number,
-                                  validador: (v) => (v ?? '').trim().isEmpty
-                                      ? 'Requerido'
-                                      : null,
+                                  validador: Validadores.requerido,
                                 ),
                                 _CapturaCedula(
                                   bytes: _bytesCedula,
@@ -300,9 +313,7 @@ class _PantallaRegistroUsuarioState
                                   pista: '0412 000 0000',
                                   icono: Icons.phone_iphone_rounded,
                                   teclado: TextInputType.phone,
-                                  validador: (v) => (v ?? '').trim().isEmpty
-                                      ? 'Requerido'
-                                      : null,
+                                  validador: Validadores.requerido,
                                 ),
                                 CampoTexto(
                                   controlador: _controladorDireccion,
@@ -310,9 +321,7 @@ class _PantallaRegistroUsuarioState
                                   pista: 'Calle, edificio, referencia',
                                   icono: Icons.location_on_outlined,
                                   maxLineas: 2,
-                                  validador: (v) => (v ?? '').trim().isEmpty
-                                      ? 'Requerido'
-                                      : null,
+                                  validador: Validadores.requerido,
                                 ),
                               ],
                             ),
@@ -330,9 +339,7 @@ class _PantallaRegistroUsuarioState
                                   pista: 'tucorreo@ejemplo.com',
                                   icono: Icons.alternate_email_rounded,
                                   teclado: TextInputType.emailAddress,
-                                  validador: (v) => (v ?? '').contains('@')
-                                      ? null
-                                      : 'Ingresa un correo válido',
+                                  validador: Validadores.correo,
                                 ),
                                 CampoTexto(
                                   controlador: _controladorContrasena,
@@ -352,9 +359,7 @@ class _PantallaRegistroUsuarioState
                                           !_ocultarContrasena,
                                     ),
                                   ),
-                                  validador: (v) => (v ?? '').length < 6
-                                      ? 'Mínimo 6 caracteres'
-                                      : null,
+                                  validador: Validadores.contrasena,
                                 ),
                               ],
                             ),
